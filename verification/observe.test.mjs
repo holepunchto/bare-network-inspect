@@ -1,11 +1,11 @@
-// @p2p/observe — the plug-and-play umbrella. Proves runtime detection, observe()
+// @holepunchto/bare-network-inspect — the plug-and-play umbrella. Proves runtime detection, observe()
 // wiring, the buffering->attach handoff, and the init planner. On-device RN /
 // live two-peer swarm are UNVERIFIABLE HERE (C14/G4/C15) and not asserted.
 
-import { detectRuntime } from '../packages/p2p-observe/src/detect.ts';
-import { observe } from '../packages/p2p-observe/src/observe.ts';
-import { planInit } from '../packages/p2p-observe/src/init.mjs';
-import { StreamFramer } from '../packages/p2p-probe/transport/framing.ts';
+import { detectRuntime } from '../packages/bare-observe/src/detect.ts';
+import { observe } from '../packages/bare-observe/src/observe.ts';
+import { planInit } from '../packages/bare-observe/src/init.mjs';
+import { StreamFramer } from '../packages/bare-probe/transport/framing.ts';
 
 let failures = 0;
 const check = (name, cond, detail = '') => {
@@ -13,7 +13,7 @@ const check = (name, cond, detail = '') => {
   if (!cond) failures++;
 };
 
-console.log('observe.test.mjs — @p2p/observe plug-and-play\n');
+console.log('observe.test.mjs — @holepunchto/bare-network-inspect plug-and-play\n');
 
 // --- (1) runtime detection across every target (injected fake globals) ---
 const det = (env) => detectRuntime(env).runtime;
@@ -70,7 +70,7 @@ const rn = planInit({ pkg: { dependencies: { 'react-native': '0.76.0' } } });
 // Wave-B/C22 gate finding).
 const rnSnap = JSON.stringify(rn);
 check('init: react-native project -> rn runtime + worklet scaffold action',
-  rn.runtime === 'react-native' && rn.actions.some((a) => a.path === 'p2p-observe.worklet.mjs'));
+  rn.runtime === 'react-native' && rn.actions.some((a) => a.path === 'bare-observe.worklet.mjs'));
 const pear = planInit({ pkg: { pear: { type: 'terminal' }, dependencies: { hyperswarm: '^4' } } });
 check('init: pear project -> pear runtime, no file actions (auto-swarm)', pear.runtime === 'pear' && pear.actions.length === 0);
 const node = planInit({ pkg: { dependencies: {} } });
@@ -80,5 +80,5 @@ check('init: plain project -> node runtime', node.runtime === 'node');
 check('init CONTROL: planner is pure (repeatable, no writes)',
   JSON.stringify(planInit({ pkg: { dependencies: { 'react-native': '0.76.0' } } })) === rnSnap);
 
-console.log(failures === 0 ? '\nAll @p2p/observe claims verified.' : `\n${failures} claim(s) FAILED.`);
+console.log(failures === 0 ? '\nAll @holepunchto/bare-network-inspect claims verified.' : `\n${failures} claim(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

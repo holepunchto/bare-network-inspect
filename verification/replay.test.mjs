@@ -5,7 +5,7 @@
 // handler and advertises no caps; canReplay gate blocks; the gui-tag never leaks onto a later
 // organic call. Uses an injected fake WebSocket (no real network).
 
-import { observe } from '../packages/p2p-observe/src/observe.ts';
+import { observe } from '../packages/bare-observe/src/observe.ts';
 
 let failures = 0;
 const check = (name, cond, detail = '') => {

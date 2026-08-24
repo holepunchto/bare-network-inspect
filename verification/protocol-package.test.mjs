@@ -1,4 +1,4 @@
-// Proves the @p2p/protocol L0 package holds its contract:
+// Proves the @holepunchto/bare-protocol L0 package holds its contract:
 //   (a) LOSSLESS encode->decode round-trip for all 4 encodings, with identity
 //       carried AND dropped, PLUS a CONTROL: a corrupted buffer must FAIL decode.
 //   (b) version negotiation picks the highest common version and refuses
@@ -16,7 +16,7 @@ import {
   encode, decode, MethodRegistryImpl, PeerRegistry,
   negotiate, tolerantSelect, V1_FIELDS,
   checkIdentityDrop, canDropIdentity, ENCODING_IDS,
-} from '../packages/p2p-protocol/src/index.ts';
+} from '../packages/bare-protocol/src/index.ts';
 
 let pass = 0, fail = 0;
 const ok = (c, m) => { c ? (pass++, console.log('  PASS  ' + m)) : (fail++, console.log('  FAIL  ' + m)); };

@@ -2,8 +2,8 @@
 // peer ids / signalling tokens / bodies never reach the exporter (hub / .p2plog). The
 // CONTROL (redact:false) shows the same data leaks unredacted — redaction is load-bearing.
 
-import { observe } from '../packages/p2p-observe/src/observe.ts';
-import { StreamFramer } from '../packages/p2p-probe/transport/framing.ts';
+import { observe } from '../packages/bare-observe/src/observe.ts';
+import { StreamFramer } from '../packages/bare-probe/transport/framing.ts';
 
 let failures = 0;
 const check = (name, cond, detail = '') => {

@@ -1,6 +1,6 @@
 // testnet-capture.test.mjs — PHASE 1: deterministic multi-peer capture (integration test).
 //
-// Proves: two INDEPENDENT p2p-observe instances (one per peer), each tapping its own RPC boundary,
+// Proves: two INDEPENDENT bare-observe instances (one per peer), each tapping its own RPC boundary,
 // both capture their end of an exchange that crosses a REAL Hyperswarm connection — with distinct
 // source ids. Control: un-tapped services capture nothing (the tap is what produces events).
 //
@@ -19,7 +19,7 @@
 // The connected-path assertions are therefore UNVERIFIED in this sandbox; the setup + skip + teardown
 // paths ARE verified here (the test exits cleanly with SKIP).
 
-import { observe } from '../packages/p2p-observe/src/observe.ts';
+import { observe } from '../packages/bare-observe/src/observe.ts';
 
 let failures = 0;
 const check = (name, cond, detail = '') => {
@@ -50,7 +50,7 @@ const topic = crypto.discoveryKey(crypto.randomBytes(32));
 const a = new Hyperswarm({ bootstrap: testnet.bootstrap });
 const b = new Hyperswarm({ bootstrap: testnet.bootstrap });
 
-// A p2p-observe instance per peer, each with a distinct source; collect events locally (custom
+// A bare-observe instance per peer, each with a distinct source; collect events locally (custom
 // exporter, redaction OFF so we can assert on the raw src id) instead of shipping to a GUI.
 const evA = [], evB = [];
 const obsA = observe({ exporter: { export: (batch) => evA.push(...batch) }, redact: false, source: { deviceId: 'peerA', appId: 'demo' } });

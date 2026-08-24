@@ -2,7 +2,7 @@
 // random page you visit can't open ws://127.0.0.1:PORT and drive replay. App reporters (no Origin)
 // and the served GUI page (same-origin / loopback) must still connect.
 
-import { originAllowed, startGui } from '../packages/p2p-observe/gui/server.mjs';
+import { originAllowed, startGui } from '../packages/bare-observe/gui/server.mjs';
 import net from 'node:net';
 import crypto from 'node:crypto';
 

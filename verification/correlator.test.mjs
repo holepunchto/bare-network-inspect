@@ -1,6 +1,6 @@
 // Proves the L2 collector claims against the SHIPPED source module
-// (packages/p2p-probe/core). This test used to carry its implementation inline;
-// the logic now lives in @p2p/probe and this suite exercises the real exports so
+// (packages/bare-probe/core). This test used to carry its implementation inline;
+// the logic now lives in @holepunchto/bare-probe and this suite exercises the real exports so
 // the assertions guard what other layers actually import.
 //
 //   1. Memory is bounded under unbounded input (no leak) — ring buffer + bounded
@@ -16,7 +16,7 @@
 //
 // Node 24 strips TS types, so this .mjs imports the .ts sources directly.
 
-import { Collector, Sampler, BatchFlusher, CollectorSink } from '../packages/p2p-probe/core/index.ts';
+import { Collector, Sampler, BatchFlusher, CollectorSink } from '../packages/bare-probe/core/index.ts';
 
 let failures = 0;
 const check = (name, cond, detail = '') => {

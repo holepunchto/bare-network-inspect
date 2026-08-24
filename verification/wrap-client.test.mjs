@@ -3,7 +3,7 @@
 // and (control) does nothing when unwrapped / when stream monitoring is off.
 
 import { EventEmitter } from 'node:events';
-import { wrapClient } from '../packages/p2p-observe/src/wrap-client.ts';
+import { wrapClient } from '../packages/bare-observe/src/wrap-client.ts';
 
 let failures = 0;
 const check = (name, cond, detail = '') => {

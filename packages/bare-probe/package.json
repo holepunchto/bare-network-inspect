@@ -1,0 +1,30 @@
+{
+  "name": "@holepunchto/bare-probe",
+  "version": "0.0.0",
+  "description": "L1+L2 shared package per docs/00-technical-plan.md §3 layout: core/ (L2 ring buffer + correlator + sampler + flush + ingestion sink, collector-engineer), clock/ (HLC + offset estimation, clock-engineer), adapters/ + src/sink.ts (L1 transport taps: webrtc.ts, websocket.ts, EventSink contract, probe-engineer). Three Wave-A workstreams land in this one package by design (see docs/03-orchestration.md Phase 2 'parallel, independent') — this file is the merge point; do not let one agent's write clobber another's export.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./core/index.ts",
+      "default": "./core/index.ts"
+    },
+    "./ring-buffer": "./core/ring-buffer.ts",
+    "./correlator": "./core/correlator.ts",
+    "./sampler": "./core/sampler.ts",
+    "./flush": "./core/flush.ts",
+    "./core-sink": "./core/sink.ts",
+    "./clock": {
+      "types": "./clock/index.ts",
+      "default": "./clock/index.ts"
+    },
+    "./sink": "./src/sink.ts",
+    "./adapters/webrtc": "./adapters/webrtc.ts",
+    "./adapters/websocket": "./adapters/websocket.ts"
+  },
+  "files": ["core", "clock", "src", "adapters"],
+  "sideEffects": false,
+  "dependencies": {
+    "@holepunchto/bare-protocol": "workspace:*"
+  },
+  "license": "UNLICENSED"
+}

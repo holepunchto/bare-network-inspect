@@ -2,7 +2,7 @@
 // Proves: events queue while disconnected, flush on open, send while open; control shows
 // nothing sends after close. Uses an injected fake WebSocket (no real network).
 
-import { createWebSocketReporter } from '../packages/p2p-observe/src/reporters.ts';
+import { createWebSocketReporter } from '../packages/bare-observe/src/reporters.ts';
 
 let failures = 0;
 const check = (name, cond, detail = '') => {

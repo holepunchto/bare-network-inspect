@@ -23,10 +23,10 @@ const obs = observe({ websocket: 'ws://127.0.0.1:9420/ws' })   // reliable local
 const client = obs.wrapClient(myRpcClient)                     // endpoint + request + response + streams
 ```
 ```bash
-npx p2p-observe gui                       # open the inspector at http://localhost:9420
+npx bare-observe gui                       # open the inspector at http://localhost:9420
 ```
 
-Full reference: [packages/p2p-observe/USAGE.md](packages/p2p-observe/USAGE.md).
+Full reference: [packages/bare-observe/USAGE.md](packages/bare-observe/USAGE.md).
 
 ## Publishing / how others install
 

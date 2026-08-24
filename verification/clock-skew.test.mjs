@@ -1,4 +1,4 @@
-// Exercises the EXTRACTED clock module (packages/p2p-probe/clock) beyond the 8
+// Exercises the EXTRACTED clock module (packages/bare-probe/clock) beyond the 8
 // legacy assertions in clock.test.mjs:
 //
 //   (C8) reproduces "lowest-RTT beats median under asymmetric routing" with the
@@ -23,7 +23,7 @@ import {
   median,
   stddev,
   skewConfidence,
-} from '../packages/p2p-probe/clock/index.ts';
+} from '../packages/bare-probe/clock/index.ts';
 
 let failures = 0;
 function check(name, cond, detail = '') {
@@ -52,7 +52,7 @@ function simSamples(trueOffset, n, jitterMs, asymmetry, seed = 42, startLocal = 
 
 const TRUE = -8000;
 
-console.log('clock-skew.test.mjs — extracted @p2p/probe/clock module\n');
+console.log('clock-skew.test.mjs — extracted @holepunchto/bare-probe/clock module\n');
 
 // =============================================================================
 // (C8) lowest-RTT vs median — measured THIS run, symmetric vs asymmetric

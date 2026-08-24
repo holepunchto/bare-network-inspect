@@ -1,5 +1,5 @@
-// Proves the transport generalization layer (packages/p2p-probe/transport/,
-// packages/p2p-probe/adapters/hyperswarm.ts) holds its contract:
+// Proves the transport generalization layer (packages/bare-probe/transport/,
+// packages/bare-probe/adapters/hyperswarm.ts) holds its contract:
 //
 //   (a) StreamFramer round-trip: N envelopes, arbitrary chunk boundaries
 //       (mid-frame split AND two-frames-in-one-chunk), reassembles to
@@ -11,7 +11,7 @@
 //       tap (bytes + bufferedAmount-analog + return value + this), data tap
 //       reassembles via framing, identity from remotePublicKey.
 //       CONTROL: disabled = genuine no-op (same guarantee as WebRTC/WS).
-//   (c) capabilitiesAllowIdentityDrop + @p2p/protocol's checkIdentityDrop:
+//   (c) capabilitiesAllowIdentityDrop + @holepunchto/bare-protocol's checkIdentityDrop:
 //       both permit drop for the 1:1 hyperswarm stream and refuse it for a
 //       multiplexed descriptor — proving L0 needed ZERO changes to support
 //       the new transport.
@@ -26,11 +26,11 @@
 // method shape; this file verifies the WRAPPER + FRAMING logic only, not
 // real on-device Hyperswarm/UDX behaviour.
 
-import { StreamFramer, encodeFrame, createFramer } from '../packages/p2p-probe/transport/framing.ts';
-import { capabilitiesAllowIdentityDrop, HYPERSWARM_CAPABILITIES } from '../packages/p2p-probe/transport/capabilities.ts';
-import { instrumentHyperswarmStream, publicKeyToPeerId } from '../packages/p2p-probe/adapters/hyperswarm.ts';
-import { TRANSPORT_REGISTRY } from '../packages/p2p-probe/transport/contract.ts';
-import { checkIdentityDrop } from '../packages/p2p-protocol/src/identity.ts';
+import { StreamFramer, encodeFrame, createFramer } from '../packages/bare-probe/transport/framing.ts';
+import { capabilitiesAllowIdentityDrop, HYPERSWARM_CAPABILITIES } from '../packages/bare-probe/transport/capabilities.ts';
+import { instrumentHyperswarmStream, publicKeyToPeerId } from '../packages/bare-probe/adapters/hyperswarm.ts';
+import { TRANSPORT_REGISTRY } from '../packages/bare-probe/transport/contract.ts';
+import { checkIdentityDrop } from '../packages/bare-protocol/src/identity.ts';
 
 let pass = 0, fail = 0;
 const ok = (c, m) => { c ? (pass++, console.log('  PASS  ' + m)) : (fail++, console.log('  FAIL  ' + m)); };
@@ -249,7 +249,7 @@ console.log('\n(c) capabilities-driven identity-drop — permits 1:1 hyperswarm,
   ok(capabilitiesAllowIdentityDrop({ capabilities: HYPERSWARM_CAPABILITIES, topology: 'fanout' }) === false,
      'capabilitiesAllowIdentityDrop: REFUSES drop on fanout topology regardless of capabilities');
 
-  // Cross-check against @p2p/protocol's OWN guard (identity.ts), constructed
+  // Cross-check against @holepunchto/bare-protocol's OWN guard (identity.ts), constructed
   // with transport:'hyperswarm' — a value NOT in identity.ts's frozen
   // `Transport` union. If this throws or misbehaves, L0 would need editing
   // to support the new transport; it does not, because checkIdentityDrop's

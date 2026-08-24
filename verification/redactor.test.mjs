@@ -1,4 +1,4 @@
-// Proves the L2 central redactor (packages/p2p-probe/core/redactor.ts) makes the
+// Proves the L2 central redactor (packages/bare-probe/core/redactor.ts) makes the
 // EXPORTED form of a capture safe — the stolen-.p2plog threat model (docs/06).
 //
 // NOT wired into run-all.sh by request. Run directly:  node redactor.test.mjs
@@ -9,8 +9,8 @@
 //
 // Node 24 strips TS types, so this .mjs imports the .ts source directly.
 
-import { Redactor, PEER_HASH_PREFIX } from '../packages/p2p-probe/core/redactor.ts';
-import { PeerRegistry } from '../packages/p2p-protocol/src/registry.ts';
+import { Redactor, PEER_HASH_PREFIX } from '../packages/bare-probe/core/redactor.ts';
+import { PeerRegistry } from '../packages/bare-protocol/src/registry.ts';
 
 let failures = 0;
 const check = (name, cond, detail = '') => {

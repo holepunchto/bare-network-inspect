@@ -7,8 +7,8 @@
 // This is the app<->hub contract from the architecture diagram. Two peers connecting over a
 // real network is UNVERIFIABLE HERE (one NAT'd interface, C14/G4); the wire contract is not.
 
-import { createHyperswarmExporter } from '../packages/p2p-probe/exporters/hyperswarm.ts';
-import { StreamFramer } from '../packages/p2p-probe/transport/framing.ts';
+import { createHyperswarmExporter } from '../packages/bare-probe/exporters/hyperswarm.ts';
+import { StreamFramer } from '../packages/bare-probe/transport/framing.ts';
 
 let failures = 0;
 const check = (name, cond, detail = '') => {

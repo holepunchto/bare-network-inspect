@@ -4,7 +4,7 @@
 // Exits non-zero on failure so CI can gate on it.
 //
 // REPOINTED: the HLC and the offset math now come from the extracted source
-// module packages/p2p-probe/clock (imported directly — Node 24 strips TS types).
+// module packages/bare-probe/clock (imported directly — Node 24 strips TS types).
 // The 8 original assertions are preserved verbatim; the module is the code under
 // test. Deeper offset/skew + adversarial coverage lives in clock-skew.test.mjs.
 
@@ -13,7 +13,7 @@ import {
   compareHlc,
   offsetFromTimestamps,
   median,
-} from '../packages/p2p-probe/clock/index.ts';
+} from '../packages/bare-probe/clock/index.ts';
 
 let failures = 0;
 function check(name, cond, detail = '') {

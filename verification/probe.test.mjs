@@ -1,4 +1,4 @@
-// Proves the @p2p/probe L1 adapters (packages/p2p-probe/adapters/) hold their
+// Proves the @holepunchto/bare-probe L1 adapters (packages/bare-probe/adapters/) hold their
 // contract:
 //
 //   (a) instrumentDataChannel: send is tapped with correct bytes + the
@@ -32,13 +32,13 @@ import {
   instrumentPeerConnection,
   extractRelevant,
   byteLength,
-} from '../packages/p2p-probe/adapters/webrtc.ts';
-import { instrumentWebSocket } from '../packages/p2p-probe/adapters/websocket.ts';
+} from '../packages/bare-probe/adapters/webrtc.ts';
+import { instrumentWebSocket } from '../packages/bare-probe/adapters/websocket.ts';
 
 let pass = 0, fail = 0;
 const ok = (c, m) => { c ? (pass++, console.log('  PASS  ' + m)) : (fail++, console.log('  FAIL  ' + m)); };
 
-console.log('probe.test.mjs — @p2p/probe L1 adapter contract\n');
+console.log('probe.test.mjs — @holepunchto/bare-probe L1 adapter contract\n');
 
 // ---------------------------------------------------------------------------
 // Fakes: real METHOD SHAPES, no real transport. Labelled per invariant.
@@ -412,7 +412,7 @@ console.log('\n(g) CONTROL — disabled probe is a genuine no-op (headline guara
   ok(sink.events.length === 0, 'DISABLED: zero events emitted for WebSocket construction/send');
 }
 
-console.log('\n(h) CONTROL — build-mode gate (G3 hardening, packages/p2p-probe/adapters/env.ts):\n');
+console.log('\n(h) CONTROL — build-mode gate (G3 hardening, packages/bare-probe/adapters/env.ts):\n');
 
 {
   // NODE_ENV=production is the isProbeDisabledByBuild() signal available

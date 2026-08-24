@@ -6,7 +6,7 @@
 #   1. Push a version tag (as before):
 #        git tag v0.1.7 && git push origin v0.1.7
 #   2. Manually from the Actions tab → "release" → "Run workflow" (workflow_dispatch):
-#        pick `package` (all | p2p_observe), and optionally tick `create_tag`
+#        pick `package` (all | bare_observe), and optionally tick `create_tag`
 #        to also cut a git tag + GitHub Release from the current package.json version.
 #      Use this when the version bump is already merged to main and you'd rather click a button
 #      than push a tag locally.
@@ -30,13 +30,13 @@ on:
         default: all
         options:
           - all
-          - p2p_observe
+          - bare_observe
       create_tag:
-        description: 'Also create a git tag + GitHub Release from the current p2p_observe version'
+        description: 'Also create a git tag + GitHub Release from the current bare_observe version'
         type: boolean
         default: false
       tag:
-        description: 'Tag name to create (optional; defaults to v<p2p_observe version>). Only used if create_tag is ticked.'
+        description: 'Tag name to create (optional; defaults to v<bare_observe version>). Only used if create_tag is ticked.'
         type: string
         default: ''
 
@@ -67,11 +67,11 @@ jobs:
           set -euo pipefail
           if [ "$EVENT" = "workflow_dispatch" ] && [ -n "$PACKAGE" ] && [ "$PACKAGE" != "all" ]; then
             case "$PACKAGE" in
-              p2p_observe) DIRS="packages/p2p-observe" ;;
+              bare_observe) DIRS="packages/bare-observe" ;;
               *) echo "unknown package: $PACKAGE" >&2; exit 1 ;;
             esac
           else
-            DIRS="packages/p2p-observe"
+            DIRS="packages/bare-observe"
           fi
           echo "dirs=$DIRS" >> "$GITHUB_OUTPUT"
           echo "publishing: $DIRS"
@@ -112,7 +112,7 @@ jobs:
           set -euo pipefail
           TAG="$TAG_INPUT"
           if [ -z "$TAG" ]; then
-            TAG="v$(jq -r .version packages/p2p-observe/package.json)"   # jq is preinstalled on GitHub-hosted runners
+            TAG="v$(jq -r .version packages/bare-observe/package.json)"   # jq is preinstalled on GitHub-hosted runners
           fi
           if git ls-remote --tags origin "refs/tags/$TAG" | grep -q "refs/tags/$TAG"; then
             echo "tag $TAG already exists on origin — skipping tag/release (publish above already ran)"

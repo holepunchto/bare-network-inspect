@@ -28,9 +28,9 @@
 // Imports the shipped source read-only (Node 24 strips TS types on import).
 // NOT wired into run-all.sh (per task): run with `node verification/multipeer-merge.test.mjs`.
 
-import { HybridLogicalClock, compareHlc, serializeHlc } from '../packages/p2p-probe/clock/index.ts';
-import { createHyperswarmExporter } from '../packages/p2p-probe/exporters/hyperswarm.ts';
-import { StreamFramer } from '../packages/p2p-probe/transport/framing.ts';
+import { HybridLogicalClock, compareHlc, serializeHlc } from '../packages/bare-probe/clock/index.ts';
+import { createHyperswarmExporter } from '../packages/bare-probe/exporters/hyperswarm.ts';
+import { StreamFramer } from '../packages/bare-probe/transport/framing.ts';
 
 let failures = 0;
 const check = (name, cond, detail = '') => {

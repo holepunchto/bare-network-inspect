@@ -5,7 +5,7 @@
 // call is gone; a stream's open subscription is NOT counted (by design). Controls: inflight() is
 // empty before any call and empty again after settle — so a non-empty reading is real, not vacuous.
 
-import { observe } from '../packages/p2p-observe/src/observe.ts';
+import { observe } from '../packages/bare-observe/src/observe.ts';
 import { EventEmitter } from 'node:events';
 
 let failures = 0;

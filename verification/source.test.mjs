@@ -2,8 +2,8 @@
 // source fields are REDACTED on the export path. Both were protocol-architect "fix-before-ship"
 // items; these lock them in.
 
-import { observe } from '../packages/p2p-observe/src/observe.ts';
-import { StreamFramer } from '../packages/p2p-probe/transport/framing.ts';
+import { observe } from '../packages/bare-observe/src/observe.ts';
+import { StreamFramer } from '../packages/bare-probe/transport/framing.ts';
 
 let failures = 0;
 const check = (name, cond, detail = '') => {
