@@ -1,7 +1,7 @@
 {
   "name": "@holepunchto/bare-network-inspect",
   "version": "0.1.8",
-  "description": "Plug-and-play P2P request observability — one dev dependency for React Native (bare-kit worklets), plain Pear/Bare apps, and desktop (Electron/Node). Auto-detects runtime and hub transport; redacts on export by default.",
+  "description": "Network inspector for Bare, Pear, and React Native P2P/hrpc apps. Tap an RPC client or a raw transport with one call and read endpoint, request, response, latency, and live subscription streams in a local GUI (`npx bare-observe gui`) — or omit the GUI and merge multi-peer timelines over a Hyperswarm hub. Auto-detects the runtime (React Native via bare-kit worklets, Pear/Bare, Electron/Node, browser); redacts peer ids, URL tokens, and bodies on export by default.",
   "type": "module",
   "main": "./dist/index.js",
   "bin": {

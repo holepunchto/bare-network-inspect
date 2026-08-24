@@ -8,7 +8,7 @@ hrpc based debugging and observability for Bare.
 bash verification/run-all.sh     # runs the full gate; zero dependencies
 ```
 
-Drop this folder into **Claude Code** or **Cowork**. Agents in `.claude/agents/` are project-scoped and load automatically — commit them so the whole team shares the same specialists.
+The suite has zero npm dependencies, so a fresh clone can run it immediately — no install step.
 
 ## Try the package (`@holepunchto/bare-network-inspect`)
 
@@ -27,6 +27,7 @@ npx bare-observe gui                       # open the inspector at http://localh
 ```
 
 Full reference: [packages/bare-observe/USAGE.md](packages/bare-observe/USAGE.md).
+Upgrading from an older release (renamed CLI, renamed scoped packages)? See [MIGRATION.md](MIGRATION.md).
 
 ## Publishing / how others install
 
@@ -53,28 +54,34 @@ For strangers to try with no token, make the **repo public** — path 2 is then 
 ## Layout
 
 ```
-docs/
-  00-technical-plan.md      Architecture: envelope, probes, L2 collector, surfaces
-  01-roles-and-skills.md    9 roles, responsibilities, skills matrix, autonomy per role
-  02-verification-log.md    Every claim + verbatim output + honest status
-  03-orchestration.md       Agent pipeline, how to run it, the 4 human gates
-.claude/
-  agents/                   8 subagents (verified frontmatter schema)
-  skills/                   3 skills: envelope design, probe instrumentation, claim verification
+packages/
+  bare-observe/             the published package — @holepunchto/bare-network-inspect
+    src/                    observe(), wrapClient, runtime detect, reporters, init planner
+    bin/bare-observe.mjs    the CLI: `init` (dry-run by default) and `gui`
+    gui/                    dependency-free inspector UI + WebSocket server
+    USAGE.md                full export reference, every symbol with verified signatures
+  bare-probe/               internal L1+L2 engine (unpublished, relative-imported)
+    core/                   ring buffer, correlator, sampler, flusher, sink, redactor
+    clock/                  hybrid logical clock + offset/skew estimation
+    adapters/               WebRTC, WebSocket, Hyperswarm transport taps
+    transport/              length-prefixed framing + capability contract
+    native/                 iOS/Android probe bridge (schema-mirroring, see its README)
+  bare-protocol/            internal L0 wire contract (unpublished, relative-imported)
+    src/                    P2PEnvelope, encodings, version negotiation, identity guard
 verification/
   run-all.sh                CI gate — non-zero exit blocks merge
-  clock.test.mjs            HLC + offset estimation (8 assertions, incl. control)
-  correlator.test.mjs       L2 memory bounds + timeouts (10 assertions)
-  envelope-size.mjs         Encoding cost measurement (dependency-free)
-  cbor-selfcheck.mjs        Cross-checks the built-in CBOR sizer against cbor-x
-  validate-config.py        Validates agent/skill frontmatter against the schema
+  *.test.mjs                22 dependency-free suites (see run-all.sh for the roster)
+scripts/
+  rebrand.sh                re-applies this fork's rename over an upstream-synced tree
 ```
 
 ## Start here
 
-New to the project → `docs/01-roles-and-skills.md`.
-Deciding whether to trust any number in these docs → `docs/02-verification-log.md`.
-Running the agents → `docs/03-orchestration.md`.
+Using the package → [packages/bare-observe/README.md](packages/bare-observe/README.md), then
+[USAGE.md](packages/bare-observe/USAGE.md) for the full export reference.
+Changing the code → run `bash verification/run-all.sh` first; it is the contract.
+Syncing from upstream → [scripts/rebrand.sh](scripts/rebrand.sh) documents the whole procedure in
+its header.
 
 ## The one rule
 
@@ -91,7 +98,7 @@ Do not treat these as established:
 
 ## Automation boundary
 
-~70% of the pipeline runs unattended. Four gates cannot, each with evidence in `docs/03-orchestration.md` §4:
+~70% of the pipeline runs unattended. Four gates cannot:
 
 | Gate | Why |
 |---|---|

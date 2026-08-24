@@ -1,7 +1,7 @@
 {
   "name": "@holepunchto/bare-probe",
   "version": "0.0.0",
-  "description": "L1+L2 shared package per docs/00-technical-plan.md §3 layout: core/ (L2 ring buffer + correlator + sampler + flush + ingestion sink, collector-engineer), clock/ (HLC + offset estimation, clock-engineer), adapters/ + src/sink.ts (L1 transport taps: webrtc.ts, websocket.ts, EventSink contract, probe-engineer). Three Wave-A workstreams land in this one package by design (see docs/03-orchestration.md Phase 2 'parallel, independent') — this file is the merge point; do not let one agent's write clobber another's export.",
+  "description": "Internal (unpublished) L1+L2 engine behind @holepunchto/bare-network-inspect. core/ = ring buffer, correlator, sampler, batch flusher, ingestion sink, central redactor; clock/ = hybrid logical clock + offset/skew estimation for the multi-peer timeline; adapters/ = transport taps (WebRTC, WebSocket, Hyperswarm); transport/ = length-prefixed framing + per-transport capability contract. Consumed by relative import, not from a registry.",
   "type": "module",
   "exports": {
     ".": {

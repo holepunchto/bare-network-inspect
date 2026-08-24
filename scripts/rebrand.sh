@@ -62,8 +62,10 @@ if [ -f packages/bare-observe/bin/p2p-observe.mjs ]; then
   echo "renamed bin/p2p-observe.mjs -> bin/$NEW_CLI.mjs"
 fi
 
-# scripts/rebrand.sh is excluded: it holds upstream's spelling as search text on purpose.
-files=$(git ls-files | grep -vE 'package-lock\.json|/dist/|^scripts/rebrand\.sh$')
+# Two files are excluded because they quote upstream's spelling ON PURPOSE: this script (its
+# search text) and MIGRATION.md (it documents the before/after for readers). Rewriting either
+# one destroys its meaning.
+files=$(git ls-files | grep -vE 'package-lock\.json|/dist/|^scripts/rebrand\.sh$|^MIGRATION\.md$')
 
 # FROM/TO via the ENVIRONMENT so Perl reads them at runtime — a "/" in the value is data, never
 # the s/// delimiter. \Q…\E literal-quotes the search text; the replacement uses the plain var.
