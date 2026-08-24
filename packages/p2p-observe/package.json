@@ -1,0 +1,56 @@
+{
+  "name": "@holepunchto/bare-network-inspect",
+  "version": "0.1.8",
+  "description": "Plug-and-play P2P request observability — one dev dependency for React Native (bare-kit worklets), plain Pear/Bare apps, and desktop (Electron/Node). Auto-detects runtime and hub transport; redacts on export by default.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": {
+    "p2p-observe": "./bin/p2p-observe.mjs"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./detect": "./dist/detect.js",
+    "./observe": "./dist/observe.js"
+  },
+  "files": [
+    "dist",
+    "src",
+    "bin",
+    "gui",
+    "README.md",
+    "USAGE.md"
+  ],
+  "scripts": {
+    "build": "esbuild src/index.ts src/detect.ts src/observe.ts --bundle --format=esm --platform=neutral --external:hyperswarm --external:hypercore-crypto --outdir=dist",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/holepunchto/bare-network-inspect.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "peerDependencies": {
+    "hypercore-crypto": "^3.0.0",
+    "hyperswarm": "^4.0.0",
+    "react-native-bare-kit": "*"
+  },
+  "peerDependenciesMeta": {
+    "hyperswarm": {
+      "optional": true
+    },
+    "hypercore-crypto": {
+      "optional": true
+    },
+    "react-native-bare-kit": {
+      "optional": true
+    }
+  },
+  "sideEffects": false,
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

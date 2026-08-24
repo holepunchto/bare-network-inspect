@@ -1,0 +1,21 @@
+{
+  "name": "@p2p/protocol",
+  "version": "0.0.0",
+  "description": "L0 shared P2P envelope contract: types, four selectable encodings, version negotiation, identity-drop guard.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./envelope": "./src/envelope.ts",
+    "./encode": "./src/encode.ts",
+    "./decode": "./src/decode.ts",
+    "./version": "./src/version.ts",
+    "./identity": "./src/identity.ts",
+    "./registry": "./src/registry.ts"
+  },
+  "files": ["src"],
+  "sideEffects": false,
+  "license": "UNLICENSED"
+}

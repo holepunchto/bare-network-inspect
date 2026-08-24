@@ -1,0 +1,124 @@
+# Publish the repo's packages (@holepunchto/bare-network-inspect) to
+# GitHub Packages. Uses the CI-provided GITHUB_TOKEN (no personal token to manage). The
+# verification gate runs first — a red suite blocks the publish.
+#
+# TWO WAYS TO RELEASE:
+#   1. Push a version tag (as before):
+#        git tag v0.1.7 && git push origin v0.1.7
+#   2. Manually from the Actions tab → "release" → "Run workflow" (workflow_dispatch):
+#        pick `package` (all | p2p_observe), and optionally tick `create_tag`
+#        to also cut a git tag + GitHub Release from the current package.json version.
+#      Use this when the version bump is already merged to main and you'd rather click a button
+#      than push a tag locally.
+#
+# Each package publishes from its OWN package.json version, independent of any tag string.
+# Publishing is IDEMPOTENT: a package whose version is already on the registry is SKIPPED, not
+# failed — so releasing one package never fails on another's unchanged version, and re-running is
+# safe. NOTE: this workflow does NOT bump versions (main is protected) — bump via a PR first, then
+# release. A tag created here via GITHUB_TOKEN does not re-trigger the tag-push run (GitHub blocks
+# recursive GITHUB_TOKEN triggers), so there's no double publish.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Which package to publish'
+        type: choice
+        default: all
+        options:
+          - all
+          - p2p_observe
+      create_tag:
+        description: 'Also create a git tag + GitHub Release from the current p2p_observe version'
+        type: boolean
+        default: false
+      tag:
+        description: 'Tag name to create (optional; defaults to v<p2p_observe version>). Only used if create_tag is ticked.'
+        type: string
+        default: ''
+
+permissions:
+  contents: write      # write needed only for the optional tag/release step; read would suffice otherwise
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://npm.pkg.github.com'
+
+      - name: Verification gate (blocks publish if red)
+        run: bash verification/run-all.sh
+
+      - name: Resolve target package dirs
+        id: pick
+        env:
+          EVENT: ${{ github.event_name }}
+          PACKAGE: ${{ inputs.package }}      # empty on tag-push; a choice value on dispatch
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = "workflow_dispatch" ] && [ -n "$PACKAGE" ] && [ "$PACKAGE" != "all" ]; then
+            case "$PACKAGE" in
+              p2p_observe) DIRS="packages/p2p-observe" ;;
+              *) echo "unknown package: $PACKAGE" >&2; exit 1 ;;
+            esac
+          else
+            DIRS="packages/p2p-observe"
+          fi
+          echo "dirs=$DIRS" >> "$GITHUB_OUTPUT"
+          echo "publishing: $DIRS"
+
+      - name: Install build deps + publish (idempotent, per package)
+        env:
+          DIRS: ${{ steps.pick.outputs.dirs }}
+          # The committed .npmrc authenticates via ${GITHUB_TOKEN}; also set NODE_AUTH_TOKEN for
+          # setup-node's generated ~/.npmrc. Both point at the CI token (has packages:write here).
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          publish_pkg() {
+            dir="$1"
+            echo "::group::publish $dir"
+            ( cd "$dir" && npm install --no-save ) || { echo "install failed for $dir"; echo "::endgroup::"; return 1; }
+            # prepublishOnly builds dist/; publishConfig routes to GitHub Packages.
+            out=$( cd "$dir" && npm publish 2>&1 ); rc=$?
+            echo "$out"
+            if [ $rc -eq 0 ]; then
+              echo "published $dir"
+            elif echo "$out" | grep -qiE "cannot publish over|previously published|already exists|409"; then
+              echo "version already on registry — skipping $dir (not an error)"
+            else
+              echo "publish failed for $dir"; echo "::endgroup::"; return 1
+            fi
+            echo "::endgroup::"
+          }
+          for d in $DIRS; do publish_pkg "$d" || exit 1; done
+
+      - name: Create git tag + GitHub Release (manual dispatch, opt-in)
+        if: github.event_name == 'workflow_dispatch' && inputs.create_tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_INPUT: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          TAG="$TAG_INPUT"
+          if [ -z "$TAG" ]; then
+            TAG="v$(jq -r .version packages/p2p-observe/package.json)"   # jq is preinstalled on GitHub-hosted runners
+          fi
+          if git ls-remote --tags origin "refs/tags/$TAG" | grep -q "refs/tags/$TAG"; then
+            echo "tag $TAG already exists on origin — skipping tag/release (publish above already ran)"
+          else
+            # gh release create makes the tag AND the GitHub Release at the current commit.
+            gh release create "$TAG" --title "$TAG" --target "$GITHUB_SHA" \
+              --notes "Automated release via workflow_dispatch (package: ${{ inputs.package }})."
+            echo "created tag + release $TAG"
+          fi
