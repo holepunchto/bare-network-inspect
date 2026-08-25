@@ -19,6 +19,7 @@
     "dist",
     "bin",
     "gui",
+    "src/init.mjs",
     "README.md",
     "USAGE.md",
     "LICENSE",

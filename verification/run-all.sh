@@ -32,6 +32,7 @@ run "source.test.mjs (source id injectivity + redaction)" "node source.test.mjs"
 run "replay.test.mjs (GUI replay: enforced by corrId + gating + controls)" "node replay.test.mjs"
 run "origin-guard.test.mjs (WS upgrade rejects cross-origin pages)" "node origin-guard.test.mjs"
 run "testnet-capture.test.mjs (multi-peer capture; SKIPs w/o deps or udx)" "node testnet-capture.test.mjs"
+run "tarball-cli.test.mjs (PUBLISHED artifact resolves + bin survives npm)" "node tarball-cli.test.mjs"
 run "cbor-selfcheck.mjs (optional cross-check)"  "node cbor-selfcheck.mjs"
 
 if [ $fail -eq 0 ]; then
