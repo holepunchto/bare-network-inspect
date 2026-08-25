@@ -1,6 +1,4 @@
 // L1 probe — WebSocket signalling tap.
-// Per docs/00-technical-plan.md §4.2 ("Wrap global WebSocket constructor at
-// app entry") and docs/03-orchestration.md Phase 2.
 //
 // Wraps at the MODULE IMPORT BOUNDARY: call `instrumentWebSocket(globalObj,
 // sink)` once, at app entry, before any module constructs a WebSocket. Every
@@ -60,7 +58,7 @@ export function instrumentWebSocket(
 ): Uninstrument {
   if (opts.enabled === false || isProbeDisabledByBuild()) {
     // Genuine no-op: globalObj.WebSocket is never reassigned, same shape as
-    // the `enabled: false` path (see ./env.ts / docs/00-technical-plan.md §9:313).
+    // the `enabled: false` path (see ./env.ts).
     return { restore() {} };
   }
 

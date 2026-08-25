@@ -1,7 +1,7 @@
 // The ONE seam every transport implements. `core/` (L2) depends only on
 // `EventSink`/`L2Event` (../src/sink.ts) — never on this interface and never
-// on any per-transport type — which is what makes docs/00-technical-plan.md
-// §3's claim literal: adding a transport touches L1 only.
+// on any per-transport type — which is what makes the layering claim literal:
+// adding a transport touches L1 only.
 //
 // This file does not change adapter call signatures that already shipped
 // (instrumentDataChannel/instrumentWebSocket keep taking `peerId` as an

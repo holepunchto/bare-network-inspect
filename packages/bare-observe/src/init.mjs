@@ -14,7 +14,7 @@ const WORKLET_SCAFFOLD = `// bare-observe.worklet.mjs — runs INSIDE a react-na
 // RN JS thread. The RN side pipes its transport handles in over the worklet IPC.
 //
 // UNVERIFIED on-device: needs react-native-bare-kit + a device/simulator to run
-// (no RN toolchain here — CLAUDE.md C15). Verify the bare-kit Worklet API against
+// (no React Native toolchain in this environment). Verify the bare-kit Worklet API against
 // current Holepunch docs before shipping.
 import { observe } from '@holepunchto/bare-network-inspect';
 

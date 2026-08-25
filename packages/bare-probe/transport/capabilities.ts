@@ -5,8 +5,8 @@
 // ('libp2p' | 'webrtc-dc' | 'raw-tcp' | 'raw-udp') that is frozen L0 wire
 // contract. Adding Hyperswarm (or any future transport) should NOT require
 // widening that union or touching L0 — that would mean `core/` (and the L0
-// package three other agents build against) changes every time L1 grows a
-// transport, which violates docs/00-technical-plan.md §3's promise that
+// package everything else builds against) changes every time L1 grows a
+// transport, which violates the layering promise that
 // "only L1 and L4 are platform-specific."
 //
 // So: every adapter DESCRIBES itself with a `TransportCapabilities` value.

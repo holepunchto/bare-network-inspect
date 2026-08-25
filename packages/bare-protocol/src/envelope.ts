@@ -1,6 +1,6 @@
 // L0 wire contract. Every downstream layer (L1 probes, L2 collector, L4 panel)
 // imports THIS file. Field names are frozen — three other build agents build
-// against them. See docs/00-technical-plan.md §2.1.
+// against them.
 
 export type PeerId = string;
 

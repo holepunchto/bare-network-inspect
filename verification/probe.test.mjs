@@ -19,10 +19,10 @@
 //   (g) CONTROL — with `enabled: false`, every instrument*() call is a
 //       genuine no-op: original send is called with IDENTICAL args, SAME
 //       return value, SAME call count, and ZERO events emitted. This is the
-//       headline guarantee (R2 §2 / CLAUDE.md): without this control, a probe
+//       headline guarantee: without this control, a probe
 //       that happens to pass (a)-(f) could still corrupt the disabled path.
 //
-// No real WebRTC/WebSocket stack exists in this sandbox (CLAUDE.md: no
+// No real WebRTC/WebSocket stack exists in this sandbox (no
 // toolchain). The fakes below implement the real method SHAPES
 // (send/bufferedAmount/addEventListener, getStats() Promise, WebSocket
 // constructor+send+addEventListener) to test the WRAPPER LOGIC only.

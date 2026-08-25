@@ -1,4 +1,4 @@
-// UNVERIFIED — written without a compiler in this environment (CLAUDE.md C15). Requires Xcode/Android Studio + signing to build and validate.
+// UNVERIFIED — written without a compiler in this environment. Requires Xcode/Android Studio + signing to build and validate.
 //
 // ReactPackage registration for the Android native probe. Add this to the
 // host app's getPackages() (or rely on autolinking once this is published as an

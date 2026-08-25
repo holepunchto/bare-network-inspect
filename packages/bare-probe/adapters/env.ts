@@ -1,9 +1,9 @@
 // Shared build-mode guard for the L1 adapters (webrtc.ts, websocket.ts,
-// hyperswarm.ts). Part of G3 (release-bundle audit, docs/03-orchestration.md
-// §4) hardening: docs/00-technical-plan.md §9:313 says gate probe calls
-// behind `__DEV__` AND strip with a Babel plugin, because DCE is not
-// guaranteed for method calls with side effects. This file is the `__DEV__`
-// half; ../../babel-plugin-p2p-strip is the strip half.
+// hyperswarm.ts). Release-bundle hardening: probe calls are gated behind
+// `__DEV__` AND meant to be stripped by a Babel plugin, because dead-code
+// elimination is not guaranteed for method calls with side effects. This file
+// is the `__DEV__` half. The strip half is NOT in this repo — ship a release
+// build without it and the gate below is your only protection.
 //
 // SEMANTICS — deliberately conservative, "disable only on explicit signal":
 //   - `__DEV__ === false` (RN/Metro sets this global; `false` in release

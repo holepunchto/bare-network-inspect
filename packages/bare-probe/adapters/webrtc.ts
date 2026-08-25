@@ -1,7 +1,6 @@
 // L1 probe — WebRTC DataChannel + RTCPeerConnection tap.
-// Per docs/00-technical-plan.md §4.1 and docs/03-orchestration.md Phase 2.
 //
-// Invariants enforced here (see CLAUDE.md / skill):
+// Invariants enforced here:
 //   1. Wrap at the import boundary (these two functions ARE that boundary —
 //      call them once per channel/connection, not per send()).
 //   2. `this` binding + return value preserved exactly: origSend is bound
@@ -138,7 +137,7 @@ export function instrumentDataChannel(
     // Genuine no-op: dc is never touched. Nothing to restore. Same shape
     // whether disabled by caller (`enabled: false`) or by build mode
     // (`__DEV__ === false` / `NODE_ENV === 'production'` — see ./env.ts and
-    // docs/00-technical-plan.md §9:313).
+    // ./env.ts).
     return { restore() {} };
   }
 
@@ -309,7 +308,7 @@ export function instrumentPeerConnection(
 // version returns a Map-like RTCStatsReport, a plain array, or nests fields
 // under different names such as `roundTripTime` vs the spec's
 // `currentRoundTripTime`) cannot be verified in this sandbox — there is no
-// react-native-webrtc install and no device/simulator here (CLAUDE.md: no
+// react-native-webrtc install and no device/simulator here (no
 // toolchain). What IS verified below (verification/probe.test.mjs) is that
 // this normaliser produces the identical NormalisedStats shape for two
 // concrete, plausible container shapes (Map-like per the W3C spec, and a

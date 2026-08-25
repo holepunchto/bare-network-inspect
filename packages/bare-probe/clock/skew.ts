@@ -1,7 +1,7 @@
 // Per-peer skew CONFIDENCE INTERVAL — the signal the UI uses to decide whether
 // to draw a peer's lane as a precise bar or a hatched (uncertain) band.
 //
-// INVARIANT 3 (CLAUDE.md): surface uncertainty. When confidence is poor the lane
+// INVARIANT 3: surface uncertainty. When confidence is poor the lane
 // renders hatched rather than drawing a precise-looking bar. A timeline that
 // admits it is unsure beats one that lies.
 //

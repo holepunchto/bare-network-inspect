@@ -1,5 +1,5 @@
 // L2 batched flush. The Rozenite bridge does NO batching of its own — `send`/
-// `onMessage`/`request`/`close` only (CLAUDE.md, docs/02-verification-log.md C3).
+// `onMessage`/`request`/`close` only (proven in verification/correlator.test.mjs).
 // A per-event `send` therefore saturates the bridge at gossip rates. This flusher
 // coalesces rows and ships one batch per interval (100-250ms). `add` NEVER sends;
 // only the timer (or an explicit manual tick in tests) does.

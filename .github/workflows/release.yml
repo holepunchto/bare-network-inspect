@@ -1,6 +1,7 @@
-# Publish the repo's packages (@holepunchto/bare-network-inspect) to
-# GitHub Packages. Uses the CI-provided GITHUB_TOKEN (no personal token to manage). The
-# verification gate runs first — a red suite blocks the publish.
+# Publish the repo's packages (@holepunchto/bare-network-inspect) to the PUBLIC npm registry
+# (registry.npmjs.org). Needs an NPM_TOKEN repo secret — an npm *automation* token, which bypasses
+# 2FA in CI — with publish rights on the @holepunchto scope. The verification gate runs first: a red
+# suite blocks the publish.
 #
 # TWO WAYS TO RELEASE:
 #   1. Push a version tag (as before):
@@ -42,7 +43,6 @@ on:
 
 permissions:
   contents: write      # write needed only for the optional tag/release step; read would suffice otherwise
-  packages: write
 
 jobs:
   publish:
@@ -53,7 +53,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          registry-url: 'https://npm.pkg.github.com'
+          registry-url: 'https://registry.npmjs.org'
+          # scope matters: WITHOUT it setup-node sets the DEFAULT registry, which would send public
+          # deps (esbuild) to the scoped registry too. With it, only @holepunchto is mapped.
+          scope: '@holepunchto'
 
       - name: Verification gate (blocks publish if red)
         run: bash verification/run-all.sh
@@ -79,17 +82,16 @@ jobs:
       - name: Install build deps + publish (idempotent, per package)
         env:
           DIRS: ${{ steps.pick.outputs.dirs }}
-          # The committed .npmrc authenticates via ${GITHUB_TOKEN}; also set NODE_AUTH_TOKEN for
-          # setup-node's generated ~/.npmrc. Both point at the CI token (has packages:write here).
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # No .npmrc is committed — auth comes solely from setup-node's generated config, which
+          # reads NODE_AUTH_TOKEN. This must be the npm automation token, NOT the GitHub token.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -uo pipefail
           publish_pkg() {
             dir="$1"
             echo "::group::publish $dir"
             ( cd "$dir" && npm install --no-save ) || { echo "install failed for $dir"; echo "::endgroup::"; return 1; }
-            # prepublishOnly builds dist/; publishConfig routes to GitHub Packages.
+            # prepublishOnly builds dist/; publishConfig sets access:public for the scoped name.
             out=$( cd "$dir" && npm publish 2>&1 ); rc=$?
             echo "$out"
             if [ $rc -eq 0 ]; then

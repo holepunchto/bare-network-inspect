@@ -25,7 +25,7 @@
 set -euo pipefail
 
 # ---- fork identity ----
-NEW_SCOPE="@holepunchto"                              # GitHub Packages scope = repo owner org
+NEW_SCOPE="@holepunchto"                              # npm scope (also the GitHub org)
 NEW_OBSERVE="$NEW_SCOPE/bare-network-inspect"         # published name for upstream's p2p_observe
 NEW_THREADS="$NEW_SCOPE/bare-network-inspect-threads" # no-op here (p2p_threads not vendored), kept for parity
 NEW_PROBE="$NEW_SCOPE/bare-probe"                     # internal workspace pkg (unpublished)

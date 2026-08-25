@@ -1,4 +1,4 @@
-// UNVERIFIED — written without a compiler in this environment (CLAUDE.md C15). Requires Xcode/Android Studio + signing to build and validate.
+// UNVERIFIED — written without a compiler in this environment. Requires Xcode/Android Studio + signing to build and validate.
 //
 // ObjC++ registration shim. Bridges the Swift `P2PNativeProbe` class to React
 // Native's TurboModule + event-emitter machinery. In the New Architecture,

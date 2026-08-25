@@ -1,11 +1,11 @@
-// UNVERIFIED — written without a compiler in this environment (CLAUDE.md C15). Requires Xcode/Android Studio + signing to build and validate.
+// UNVERIFIED — written without a compiler in this environment. Requires Xcode/Android Studio + signing to build and validate.
 //
 // TurboModule TypeScript spec. React Native codegen consumes THIS file to
 // generate the native spec protocol (iOS: NativeP2PNativeProbeSpec ObjC/Swift
 // protocol; Android: the JNI stubs). The Swift/Kotlin implementations conform
 // to what codegen emits from here.
 //
-// INVARIANT 2 (CLAUDE.md): this is a TurboModule (`TurboModuleRegistry`), so
+// INVARIANT 2: this is a TurboModule (`TurboModuleRegistry`), so
 // the JS<->native path is JSI, not the legacy async bridge.
 //
 // UNTESTED: codegen has NOT been run. `react-native codegen` (or a pod install /

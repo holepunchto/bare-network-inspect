@@ -1,4 +1,4 @@
-// Identity-drop: an ORTHOGONAL lever (finding C20 in docs/02-verification-log.md).
+// Identity-drop: an ORTHOGONAL lever for envelope size.
 //
 // Dropping src/dst saves an identical amount at each encoding tier regardless of
 // transport (it removes the same two field-values), so it is NOT a libp2p-only

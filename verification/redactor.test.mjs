@@ -5,7 +5,7 @@
 //
 // Every leak assertion carries a CONTROL proving the redactor is load-bearing:
 // the un-redacted / default-passthrough path DOES leak, so a green assertion is
-// distinguishable from a vacuous one (CLAUDE.md "always add a control case").
+// distinguishable from a vacuous one (every claim gets a control case).
 //
 // Node 24 strips TS types, so this .mjs imports the .ts source directly.
 

@@ -1,12 +1,12 @@
 // Hybrid Logical Clock — the ORDERING authority for the multi-peer timeline.
 //
-// INVARIANT 1 (CLAUDE.md): HLC wins for ORDERING. The corrected wall clock
+// INVARIANT 1: HLC wins for ORDERING. The corrected wall clock
 // (offset.ts) is used ONLY for SPACING. When the two disagree, ordering follows
 // HLC. Two phones can differ by seconds; a raw merged timeline shows responses
 // arriving before their requests. HLC removes that lie.
 //
 // Semantics here are byte-for-byte the algorithm proven in verification/
-// clock.test.mjs (findings C5/C6, docs/02-verification-log.md). Do not "tidy"
+// clock.test.mjs. Do not "tidy"
 // the counter rules without re-running the causality control.
 
 /** Decomposed HLC. Wire form is the string "phys:ctr:node" (P2PEnvelope.hlc). */

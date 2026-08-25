@@ -3,8 +3,8 @@
 // UNVERIFIABLE HERE: `pear`/`bare` ARE installed in this sandbox (bare
 // v1.28.0, measured this session — `bare --version`), but there is no
 // running Hyperswarm connection, no second peer, and no network topology to
-// dial one (CLAUDE.md: one interface, one NAT'd network here — see
-// docs/03-orchestration.md §4 G4). What follows is verified against a FAKE
+// dial one (a single interface behind one NAT in the authoring environment;
+// two devices on two networks are needed). What follows is verified against a FAKE
 // duplex stream that mirrors NoiseSecretStream's documented method shape
 // (`.write(buf)`, `.on('data', buf)`, `.on('close')`, `.remotePublicKey`,
 // `.writableLength`) — it proves the WRAPPER + FRAMING logic, not real

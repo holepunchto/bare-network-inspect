@@ -1,6 +1,6 @@
 // @holepunchto/bare-probe/clock — clock-correctness module for the multi-peer timeline.
 //
-// Three concerns, three invariants (CLAUDE.md):
+// Three concerns, three invariants:
 //   hlc.ts    — HLC wins for ORDERING (corrected wall clock is spacing only).
 //   offset.ts — per-peer offset; raw `ts` and derived `tsNormalized` kept side
 //               by side, raw NEVER overwritten. Primary estimator lowest-RTT,

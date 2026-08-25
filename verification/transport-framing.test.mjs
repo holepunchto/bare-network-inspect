@@ -21,7 +21,7 @@
 //
 // UNVERIFIABLE HERE: `pear`/`bare` are installed (bare v1.28.0, measured this
 // session), but there is no live Hyperswarm connection, no second peer, and
-// no independent network topology available (CLAUDE.md: one NAT'd interface
+// no independent network topology available (one NAT'd interface
 // here). The FAKE duplex stream below mirrors NoiseSecretStream's documented
 // method shape; this file verifies the WRAPPER + FRAMING logic only, not
 // real on-device Hyperswarm/UDX behaviour.

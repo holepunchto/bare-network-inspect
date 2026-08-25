@@ -2,7 +2,7 @@
 //
 // G4 proper (two devices on two independently-administered networks) is
 // IMPOSSIBLE in this sandbox: one NAT'd interface, no DHT (C14/G4). See
-// docs/07-field-runbook.md for the residual human gate. What IS verifiable
+// a real two-device field test for the residual human gate. What IS verifiable
 // here is the piece the field test would exercise LAST: given frames arriving
 // from >1 peer, does the hub reassemble them and merge them into ONE honest
 // timeline?

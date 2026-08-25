@@ -1,4 +1,4 @@
-// UNVERIFIED — written without a compiler in this environment (CLAUDE.md C15). Requires Xcode/Android Studio + signing to build and validate.
+// UNVERIFIED — written without a compiler in this environment. Requires Xcode/Android Studio + signing to build and validate.
 //
 // Android native transport probe (R6). Taps Google Nearby Connections'
 // PayloadCallback (receive) and the app's sendPayload path (send), emits

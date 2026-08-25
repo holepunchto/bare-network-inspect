@@ -1,9 +1,9 @@
 // Per-peer wall-clock offset estimation over the P2P channel (NTP-style).
 //
-// INVARIANT 2 (CLAUDE.md): NEVER overwrite raw timestamps. normalize() returns
+// INVARIANT 2: NEVER overwrite raw timestamps. normalize() returns
 // the raw `ts` and derived `tsNormalized` side by side, plus the offset used.
 //
-// Finding C8 (docs/02-verification-log.md): under asymmetric routing the
+// Verified in verification/clock-skew.test.mjs: under asymmetric routing the
 // LOWEST-RTT sample suffers least asymmetry distortion and is the PRIMARY
 // estimator; median-of-N is the FALLBACK, used only when RTT variance is low
 // (little to gain from picking a single sample, and median denoises jitter).

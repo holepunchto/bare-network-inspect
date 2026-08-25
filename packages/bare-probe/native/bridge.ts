@@ -1,4 +1,4 @@
-// UNVERIFIED — written without a compiler in this environment (CLAUDE.md C15). Requires Xcode/Android Studio + signing to build and validate.
+// UNVERIFIED — written without a compiler in this environment. Requires Xcode/Android Studio + signing to build and validate.
 //
 // JS-side bridge: subscribes to the native TurboModule event emitter and routes
 // every native transport event straight into the SAME L2 EventSink the JS

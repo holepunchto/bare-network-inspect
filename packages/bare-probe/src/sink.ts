@@ -1,11 +1,10 @@
-// L1 -> L2 seam. probe-engineer builds against THIS interface, not against
-// collector-engineer's ring buffer, so the two workstreams parallelise cleanly
-// (docs/03-orchestration.md Phase 2). L2 implements EventSink; L1 never imports
-// L2's internals.
+// L1 -> L2 seam. Adapters build against THIS interface, not against the
+// collector's ring buffer, so the two sides stay independent: L2 implements
+// EventSink; L1 never imports L2's internals.
 //
 // Every adapter emits the SAME event shape regardless of transport (`type`,
 // `peerId`, `t`, plus transport-specific fields). That uniformity is what lets
-// one panel render everything — see docs/03-orchestration.md "Method".
+// one panel render everything.
 
 /** L2-lifecycle event union. Adapters MUST only ever emit one of these `type`s. */
 export type L2EventType =

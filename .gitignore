@@ -25,12 +25,17 @@ coverage/
 test-results/
 *.lcov
 
-# ---- local env & secrets (never commit; .npmrc reads $GITHUB_TOKEN at runtime) ----
+# ---- local env & secrets ----
 .env
 .env.*
 !.env.example
 *.pem
 *.key
+# No .npmrc is tracked any more: the package publishes to public npm, so neither publishing nor
+# installing needs one. Any .npmrc appearing in a working tree is therefore somebody's LOCAL auth
+# file and must never be committed.
+.npmrc
+.npmrc.local
 
 # ---- logs & crash dumps ----
 *.log

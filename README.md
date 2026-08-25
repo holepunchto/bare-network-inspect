@@ -15,7 +15,7 @@ The suite has zero npm dependencies, so a fresh clone can run it immediately —
 Observe an app's P2P/RPC traffic as a network inspector — endpoint, request, core response, latency, live subscription streams — across React Native, Pear/Bare, desktop, and browser.
 
 ```bash
-npm i -D @holepunchto/bare-network-inspect      # from GitHub Packages (auth) — or:  npm i github:holepunchto/bare-network-inspect
+npm i -D @holepunchto/bare-network-inspect      # public npm, no auth
 ```
 ```js
 import { observe } from '@holepunchto/bare-network-inspect'
@@ -31,25 +31,29 @@ Upgrading from an older release (renamed CLI, renamed scoped packages)? See [MIG
 
 ## Publishing / how others install
 
-Two ways to consume it:
+Install needs no auth — the package is on the public npm registry:
 
-1. **GitHub Packages (registry).** Tag a release → CI publishes (`.github/workflows/release.yml`):
-   ```bash
-   git tag v0.1.0 && git push --tags
-   ```
-   Consumers add an `.npmrc` + a token with `read:packages`:
-   ```
-   @holepunchto:registry=https://npm.pkg.github.com
-   //npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
-   ```
-   > GitHub Packages requires auth **even for public packages** — every consumer needs a token.
+```bash
+npm i -D @holepunchto/bare-network-inspect
+```
 
-2. **Direct from git (zero auth, if the repo is public).** A `prepare` script builds on install:
-   ```bash
-   npm i github:holepunchto/bare-network-inspect
-   ```
+Or straight from git (a `prepare` script builds on install):
 
-For strangers to try with no token, make the **repo public** — path 2 is then frictionless.
+```bash
+npm i github:holepunchto/bare-network-inspect
+```
+
+Releasing: tag a version and CI publishes it (`.github/workflows/release.yml`).
+
+```bash
+git tag v0.1.0 && git push --tags
+```
+
+The workflow runs `verification/run-all.sh` as a hard gate first, publishes from each package's own
+`package.json` version rather than the tag string, and is idempotent — a version already on the
+registry is skipped, not failed. It needs an `NPM_TOKEN` repo secret (an npm **automation** token,
+which bypasses 2FA in CI) with publish rights on the `@holepunchto` scope. No `.npmrc` is committed;
+auth comes from that secret alone.
 
 ## Layout
 
@@ -82,6 +86,10 @@ Using the package → [packages/bare-observe/README.md](packages/bare-observe/RE
 Changing the code → run `bash verification/run-all.sh` first; it is the contract.
 Syncing from upstream → [scripts/rebrand.sh](scripts/rebrand.sh) documents the whole procedure in
 its header.
+
+## License
+
+[Apache-2.0](LICENSE). Copyright notice in [NOTICE](NOTICE).
 
 ## The one rule
 

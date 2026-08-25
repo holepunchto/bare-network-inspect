@@ -1,7 +1,7 @@
 // L2 side of the L1->L2 seam. probe-engineer owns the canonical `EventSink` /
 // `L2Event` contract in ../src/sink.ts; this is L2's implementation of it. L1
 // adapters emit `L2Event`s (via `emitSafe`) and never see the ring buffer,
-// correlator or batcher behind this class (docs/03-orchestration.md Phase 2).
+// correlator or batcher behind this class.
 //
 // RECONCILIATION (done): earlier this file defined a placeholder
 // `EventSink { emit(P2PEnvelope) }`. probe-engineer's real contract has landed at

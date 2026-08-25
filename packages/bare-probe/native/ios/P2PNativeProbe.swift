@@ -1,4 +1,4 @@
-// UNVERIFIED — written without a compiler in this environment (CLAUDE.md C15). Requires Xcode/Android Studio + signing to build and validate.
+// UNVERIFIED — written without a compiler in this environment. Requires Xcode/Android Studio + signing to build and validate.
 //
 // iOS native transport probe (R6). Taps MultipeerConnectivity's MCSession
 // send + didReceive, emits os_signpost intervals for native-layer latency, and
@@ -63,7 +63,7 @@ private func monotonicMillis() -> Double {
 
 // MARK: - TurboModule
 //
-// INVARIANT 2 (CLAUDE.md): TurboModules with JSI — NOT the legacy bridge. The
+// INVARIANT 2: TurboModules with JSI — NOT the legacy bridge. The
 // legacy bridge's async NSDictionary serialisation adds latency that would
 // distort the very native-latency measurement this probe exists to take.
 //

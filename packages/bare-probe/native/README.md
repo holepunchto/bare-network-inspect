@@ -1,10 +1,10 @@
-<!-- UNVERIFIED — written without a compiler in this environment (CLAUDE.md C15). Requires Xcode/Android Studio + signing to build and validate. -->
+<!-- UNVERIFIED — written without a compiler in this environment. Requires Xcode/Android Studio + signing to build and validate. -->
 
 # R6 native transport probes (UNVERIFIED)
 
 > **Status: UNVERIFIED by construction.** Every file in this directory is source
 > only. There is no iOS or Android toolchain in this sandbox — `xcodebuild`,
-> `swift`, `gradle`, `kotlinc`, `adb` are all absent (docs/02-verification-log.md
+> `swift`, `gradle`, `kotlinc`, `adb` are all absent (verified by probing for them
 > C15; only `java` is present). Nothing here has been compiled, linked, run, or
 > profiled. Do not describe any of it as working, tested, or measured. On-device
 > `os_signpost` / `androidx.tracing` overhead (C17) is **UNVERIFIED** and no
