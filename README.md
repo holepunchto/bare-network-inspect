@@ -77,7 +77,13 @@ verification/
   *.test.mjs                22 dependency-free suites (see run-all.sh for the roster)
 scripts/
   rebrand.sh                re-applies this fork's rename over an upstream-synced tree
+.claude/agents/
+  bare-reviewer.md          strict pre-merge audit: leaks, workarounds, JS + Bare standards
 ```
+
+Run the reviewer before merging anything that touches the probe, collector, redactor, or GUI:
+ask Claude Code to `review the diff with bare-reviewer`. It reports only defects it can prove with
+`file:line` evidence and a concrete failure scenario, and it states what it could not audit.
 
 ## Start here
 
