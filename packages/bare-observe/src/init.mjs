@@ -18,6 +18,9 @@ const WORKLET_SCAFFOLD = `// bare-observe.worklet.mjs — runs INSIDE a react-na
 // current Holepunch docs before shipping.
 import { observe } from '@holepunchto/bare-network-inspect';
 
+// Replay (the GUI re-running a call the app already made) is OPT-IN and off by default: pass
+// allowInvoke: true ONLY in a dev build, and only with a 'websocket:' viewer. Leaving it out is
+// what keeps a shipped release from exposing an inbound execution surface.
 const obs = observe(); // detects Bare → auto-dials the hub topic over Hyperswarm
 // Receive transport events from the RN side over IPC and feed obs.sink, e.g.:
 //   BareKit.IPC.on('data', (buf) => obs.sink.emit(JSON.parse(buf.toString())));
@@ -33,8 +36,12 @@ const RN_SNIPPET = `// RN JS side — start the worklet (react-native-bare-kit):
 
 const DESKTOP_SNIPPET = `// Desktop (Electron main / Node) — the core runs in-process:
 //   import { observe, instrumentHyperswarmStream } from '@holepunchto/bare-network-inspect';
-//   const obs = observe();                 // Bare? auto-swarm. Node? attach() a hub stream.
-//   instrumentHyperswarmStream(conn, obs.sink, { });`;
+//   const obs = observe({
+//     websocket: 'ws://127.0.0.1:9420/ws', // stream to the local GUI (npx bare-observe gui)
+//     allowInvoke: true,                   // REPLAY IS OPT-IN. Dev builds only — it lets the GUI
+//   });                                    // re-run a call the app already made. Never ship it.
+//   instrumentHyperswarmStream(conn, obs.sink, { });
+//   // Omit 'websocket' instead and, under Bare/Pear, observe() auto-dials the Hyperswarm hub.`;
 
 const PEAR_SNIPPET = `// Pear / Bare app — nothing to configure; observe() auto-dials the hub:
 //   import { observe } from '@holepunchto/bare-network-inspect';

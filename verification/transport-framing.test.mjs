@@ -7,10 +7,16 @@
 //       CONTROL: the SAME arbitrarily-chunked byte stream, fed WITHOUT the
 //       framer (naive "one chunk == one message"), produces corrupted/
 //       misaligned output — proves framing is load-bearing, not vacuous.
-//   (b) instrumentHyperswarmStream against a FAKE NoiseSecretStream: write
-//       tap (bytes + bufferedAmount-analog + return value + this), data tap
-//       reassembles via framing, identity from remotePublicKey.
-//       CONTROL: disabled = genuine no-op (same guarantee as WebRTC/WS).
+//   (b) instrumentHyperswarmStream against a FAKE NoiseSecretStream is a
+//       PASSTHROUGH TAP IN BOTH DIRECTIONS: an app-level round trip through an
+//       instrumented writer to an UNinstrumented reader delivers byte-identical
+//       payloads, events are still emitted for both directions, and the write
+//       tap still reports bytes + bufferedAmount-analog + return value +
+//       identity from remotePublicKey.
+//       CONTROLS: (i) framing the app payload — the defect this section used to
+//       assert as DESIRED — would corrupt an unprobed receiver; (ii) the
+//       observability EXPORTER channel DOES still frame, so framing is scoped,
+//       not deleted; (iii) disabled = genuine no-op (same as WebRTC/WS).
 //   (c) capabilitiesAllowIdentityDrop + @holepunchto/bare-protocol's checkIdentityDrop:
 //       both permit drop for the 1:1 hyperswarm stream and refuse it for a
 //       multiplexed descriptor — proving L0 needed ZERO changes to support
@@ -29,6 +35,7 @@
 import { StreamFramer, encodeFrame, createFramer } from '../packages/bare-probe/transport/framing.ts';
 import { capabilitiesAllowIdentityDrop, HYPERSWARM_CAPABILITIES } from '../packages/bare-probe/transport/capabilities.ts';
 import { instrumentHyperswarmStream, publicKeyToPeerId } from '../packages/bare-probe/adapters/hyperswarm.ts';
+import { createHyperswarmExporter } from '../packages/bare-probe/exporters/hyperswarm.ts';
 import { TRANSPORT_REGISTRY } from '../packages/bare-probe/transport/contract.ts';
 import { checkIdentityDrop } from '../packages/bare-protocol/src/identity.ts';
 
@@ -118,8 +125,10 @@ console.log('\n(a) CONTROL — WITHOUT framing, the same split stream is corrupt
 
 // ---------------------------------------------------------------------------
 // (b) instrumentHyperswarmStream against a fake NoiseSecretStream duplex
+//     ADJUDICATED CONTRACT: the app-data tap OBSERVES ONLY. It must never
+//     alter, consume or reframe the application's bytes in either direction.
 // ---------------------------------------------------------------------------
-console.log('\n(b) instrumentHyperswarmStream — write tap, framed data tap, intrinsic identity:\n');
+console.log('\n(b) instrumentHyperswarmStream — PASSTHROUGH tap: app bytes unaltered in BOTH directions:\n');
 
 class MemorySink {
   constructor() { this.events = []; }
@@ -150,12 +159,182 @@ class FakeNoiseSecretStream {
   emitClose() { for (const fn of this._listeners.get('close') || []) fn(); }
 }
 
+const asBytes = (d) => (typeof d === 'string' ? new TextEncoder().encode(d) : new Uint8Array(d));
+const cat = (chunks) => {
+  const total = chunks.reduce((n, c) => n + c.length, 0);
+  const out = new Uint8Array(total);
+  let o = 0;
+  for (const c of chunks) { out.set(c, o); o += c.length; }
+  return out;
+};
+const sameBytes = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+const hex = (u8) => Array.from(u8, (x) => x.toString(16).padStart(2, '0')).join('');
+
+// ---------------------------------------------------------------------------
+// (b1) APP-LEVEL ROUND TRIP: instrumented writer -> UNinstrumented reader.
+// The remote peer is NOT required to run this probe (the adapter is exported
+// per-side: packages/bare-observe/src/index.ts), so whatever the instrumented
+// side writes must be exactly what an unprobed peer's application reads.
+// ---------------------------------------------------------------------------
+{
+  const writerSink = new MemorySink();
+  const readerSink = new MemorySink();
+
+  const writer = new FakeNoiseSecretStream(new Uint8Array([0xaa, 0xbb]));
+  instrumentHyperswarmStream(writer, writerSink);
+
+  // The reader end is a SEPARATE stream with NO instrumentation at all — it
+  // stands in for the peer application that never heard of this probe.
+  const readerReceived = [];
+  const reader = new FakeNoiseSecretStream(new Uint8Array([0xcc, 0xdd]));
+  reader.on('data', (chunk) => readerReceived.push(asBytes(chunk)));
+
+  const appPayloads = [
+    JSON.stringify({ corrId: 'a1', msgId: 'am1', method: 'blocks.fetch', kind: 'req' }),
+    'plain-string-payload',
+    '',
+    // Raw binary whose FIRST FOUR BYTES look exactly like a big length prefix:
+    // the precise input a length-prefix framer on this path would misparse.
+    new Uint8Array([0x00, 0x01, 0x86, 0xa0, 0x11, 0x22, 0x33]),
+    new Uint8Array([0xff, 0xff, 0xff, 0xff, 0x01]),
+  ];
+
+  for (const p of appPayloads) writer.write(p);
+  // The "wire": deliver, in order, exactly the bytes origWrite received.
+  for (const w of writer.writeCalls) reader.emitData(w);
+
+  const expected = cat(appPayloads.map(asBytes));
+  const actual = cat(readerReceived);
+  ok(sameBytes(actual, expected),
+    `app-level round trip: an UNinstrumented reader receives BYTE-IDENTICAL bytes to what the app wrote (${expected.length} B)`);
+  ok(actual.length === expected.length,
+    `app-level round trip: zero bytes added or removed on the app stream (got ${actual.length}, wrote ${expected.length})`);
+  ok(writer.writeCalls.length === appPayloads.length,
+    `origWrite called exactly once per app write (${writer.writeCalls.length}/${appPayloads.length})`);
+  ok(writer.writeCalls.every((w, i) => sameBytes(asBytes(w), asBytes(appPayloads[i]))),
+    'each origWrite argument equals the app payload for that call, chunk for chunk (no re-batching)');
+  ok(writer.writeCalls[1] === appPayloads[1],
+    'a string payload is handed to origWrite as the IDENTICAL value (not re-encoded to bytes by the tap)');
+  ok(writer.writeCalls[3] === appPayloads[3],
+    'a Uint8Array payload is handed to origWrite as the IDENTICAL reference (no copy, no prefix)');
+
+  // (b) events are still emitted for BOTH directions.
+  ok(writerSink.events.length === appPayloads.length,
+    `outbound: one event per write, observation intact while passing through (${writerSink.events.length})`);
+  ok(writerSink.events[0]?.type === 'request.start' && writerSink.events[0]?.corrId === 'a1',
+    "outbound: kind:'req' -> 'request.start' with corrId decoded from the app payload");
+  ok(writerSink.events.every((e) => e.transport === 'hyperswarm'), "outbound: transport tagged 'hyperswarm'");
+  ok(readerSink.events.length === 0,
+    'CONTROL: the UNinstrumented reader emits zero events (it really is unprobed — the round trip above is not self-confirming)');
+}
+
+// ---------------------------------------------------------------------------
+// (b1) CONTROL — framing the app payload (the reverted defect) DOES corrupt
+// the unprobed peer. Proves the byte-identity assertions above discriminate.
+// ---------------------------------------------------------------------------
+console.log('\n(b) CONTROL — the old behaviour (framing app data) would corrupt an unprobed peer:\n');
+{
+  const payload = JSON.stringify({ corrId: 'ctl', kind: 'req' });
+  const framed = encodeFrame(payload);       // what the defect wrote
+  const raw = asBytes(payload);              // what the app actually wrote
+
+  ok(!sameBytes(framed, raw),
+    `CONTROL: framed bytes differ from the app payload (${framed.length} B vs ${raw.length} B) — the receiver's application would see [len][payload]`);
+  ok(framed.length === raw.length + 4 && hex(framed.slice(0, 4)) === raw.length.toString(16).padStart(8, '0'),
+    'CONTROL: the difference is exactly a 4-byte big-endian length prefix prepended to the app protocol');
+
+  const writer = new FakeNoiseSecretStream(new Uint8Array([1]));
+  instrumentHyperswarmStream(writer, new MemorySink());
+  writer.write(payload);
+  ok(writer.writeCalls.length === 1 && !sameBytes(asBytes(writer.writeCalls[0]), framed),
+    'CONTROL: the CURRENT tap does NOT write the framed form (this check fails if the defect is reintroduced)');
+  ok(writer.writeCalls.length === 1 && sameBytes(asBytes(writer.writeCalls[0]), raw),
+    'CONTROL: the CURRENT tap writes the raw app payload instead');
+}
+
+// ---------------------------------------------------------------------------
+// (b2) INBOUND is observe-only: one event per 'data' chunk, no framer, no
+// buffering, bytes counted exactly, chunk never consumed or reframed.
+// ---------------------------------------------------------------------------
+console.log('\n(b) inbound tap — observes each chunk as it arrives, consumes nothing:\n');
+{
+  const stream = new FakeNoiseSecretStream(new Uint8Array([1, 2, 3]));
+  const sink = new MemorySink();
+  const appSeen = [];
+  // An application 'data' listener registered ALONGSIDE the probe: it must
+  // still see every byte, because the probe never consumes the chunk.
+  stream.on('data', (c) => appSeen.push(asBytes(c)));
+  instrumentHyperswarmStream(stream, sink, { peerId: 'explicit-peer' });
+
+  const msg1 = JSON.stringify({ corrId: 'r1', kind: 'res', method: 'blocks.fetch' });
+  const msg2 = JSON.stringify({ corrId: 'r2', kind: 'event' });
+  const chunks = [asBytes(msg1), asBytes(msg2), new Uint8Array([0xff, 0x00, 0xfe])];
+  for (const c of chunks) stream.emitData(c);
+
+  ok(sink.events.length === 3, `three inbound chunks -> exactly 3 events, emitted as they arrive (got ${sink.events.length})`);
+  ok(sink.events[0]?.type === 'request.end' && sink.events[0]?.corrId === 'r1',
+     "inbound: kind:'res' -> 'request.end', corrId decoded from the RAW (unframed) chunk");
+  ok(sink.events[1]?.type === 'message.in' && sink.events[1]?.corrId === 'r2',
+     "inbound: kind:'event' -> 'message.in', second chunk observed in order");
+  ok(sink.events[2]?.type === 'message.in' && sink.events[2]?.corrId === undefined,
+     'inbound: undecodable binary chunk still produces an event, with no envelope hint invented');
+  ok(sink.events.length === chunks.length && sink.events.every((e, i) => e.bytes === chunks[i].length),
+     'inbound: bytes is the exact chunk length for every chunk (measured, not framed)');
+  ok(sink.events.every((e) => e.transport === 'hyperswarm' && e.peerId === 'explicit-peer'),
+     'inbound: explicit peerId override respected (not forced to intrinsic identity)');
+  ok(appSeen.length === chunks.length && appSeen.every((c, i) => sameBytes(c, chunks[i])),
+     'inbound: a co-registered application listener still sees every chunk byte-for-byte (probe consumes nothing)');
+
+  // CONTROL: a length-prefix framer on this path swallows raw app bytes.
+  // Feeding the SAME chunks through StreamFramer emits nothing at all — it
+  // reads '{"co' as a ~1.7 GB length and buffers forever.
+  let framedOut = 0;
+  const wrongFramer = new StreamFramer(() => { framedOut++; });
+  for (const c of chunks) wrongFramer.push(c);
+  ok(framedOut === 0 && wrongFramer.pending === cat(chunks).length,
+     `CONTROL: a StreamFramer over these same raw app chunks emits 0 events and buffers all ${wrongFramer.pending} bytes — proves the inbound framer had to go`);
+  ok(sink.events.length === 3 && framedOut === 0,
+     'CONTROL: the passthrough tap observed all 3 chunks where the framer observed none');
+}
+
+// Malformed / hostile inbound shapes must never throw into the app's stream.
+{
+  const stream = new FakeNoiseSecretStream(new Uint8Array([7]));
+  const sink = new MemorySink();
+  instrumentHyperswarmStream(stream, sink);
+  let threw = false;
+  try {
+    stream.emitData(new Uint8Array([0xff, 0xfe, 0xfd])); // invalid UTF-8
+    stream.emitData('a string chunk');
+    stream.emitData(undefined);
+    stream.emitData({ not: 'a chunk' });
+  } catch { threw = true; }
+  ok(!threw, 'inbound: invalid UTF-8, string, undefined and non-chunk inputs never throw out of the data tap');
+}
+
+// Outbound errors from the real transport must still reach the app unchanged.
+{
+  const stream = new FakeNoiseSecretStream(new Uint8Array([8]));
+  const boom = new Error('udx: stream destroyed');
+  stream._writeImpl = () => { throw boom; };
+  const sink = new MemorySink();
+  instrumentHyperswarmStream(stream, sink);
+  let caught;
+  try { stream.write('x'); } catch (e) { caught = e; }
+  ok(caught === boom, 'outbound: a genuine transport error is rethrown to the app as the IDENTICAL error object');
+  ok(sink.events.length === 1 && sink.events[0].type === 'send.error',
+     'outbound: that failure is reported once as send.error (and only the app write lives inside the rethrowing try)');
+}
+
+// ---------------------------------------------------------------------------
+// (b3) write-tap measurements survive the passthrough change.
+// ---------------------------------------------------------------------------
+console.log('\n(b) write tap — measurements + intrinsic identity:\n');
 {
   const remoteKey = new Uint8Array([0xde, 0xad, 0xbe, 0xef, 0x01, 0x02]);
   const stream = new FakeNoiseSecretStream(remoteKey);
   stream.writableLength = 17; // the queue depth THIS write actually faced
   const sink = new MemorySink();
-  const origWriteRef = stream.write;
   instrumentHyperswarmStream(stream, sink);
 
   const payload = JSON.stringify({ corrId: 'h1', msgId: 'hm1', method: 'blocks.fetch', kind: 'req' });
@@ -163,14 +342,14 @@ class FakeNoiseSecretStream {
 
   ok(ret === true, 'write() returns the ORIGINAL return value unchanged');
   ok(stream.writeCalls.length === 1, 'origWrite called exactly once');
-  ok(stream.writeCalls[0] instanceof Uint8Array && stream.writeCalls[0].length === encodeFrame(payload).length,
-     'origWrite received the FRAMED bytes (length-prefixed) so the receiver can reassemble message boundaries');
+  ok(stream.writeCalls[0] === payload,
+     'origWrite received the app payload UNMODIFIED (identical value, no length prefix)');
 
   ok(sink.events.length === 1, 'exactly one event emitted for one write()');
-  const e = sink.events[0];
+  const e = sink.events[0] ?? {};
   ok(e.type === 'request.start', "kind:'req' -> type 'request.start' (identical vocabulary to the WebRTC adapter)");
   ok(e.bufferedAmount === 17, `writableLength captured BEFORE write (=17) — measured ${e.bufferedAmount}`);
-  ok(e.bytes === new TextEncoder().encode(payload).length, 'bytes measures the APPLICATION payload, not the framed wire size');
+  ok(e.bytes === new TextEncoder().encode(payload).length, 'bytes measures the APPLICATION payload (which is now also the wire size)');
   ok(e.transport === 'hyperswarm', "transport tagged 'hyperswarm'");
 
   // Independently recompute the expected hex (not by calling publicKeyToPeerId
@@ -180,32 +359,6 @@ class FakeNoiseSecretStream {
   ok(e.peerId === 'deadbeef0102', 'concrete expected hex matches (deadbeef0102)');
 }
 
-// Data tap: two frames coalesced in one chunk, plus a split frame — proves
-// the SAME framing correctness from (a) is actually wired into the adapter,
-// not just available as a library function nobody calls.
-{
-  const stream = new FakeNoiseSecretStream(new Uint8Array([1, 2, 3]));
-  const sink = new MemorySink();
-  instrumentHyperswarmStream(stream, sink, { peerId: 'explicit-peer' });
-
-  const msg1 = JSON.stringify({ corrId: 'r1', kind: 'res', method: 'blocks.fetch' });
-  const msg2 = JSON.stringify({ corrId: 'r2', kind: 'event' });
-  const f1 = encodeFrame(msg1);
-  const f2 = encodeFrame(msg2);
-
-  // Coalesced: both frames arrive in a single 'data' event.
-  const coalesced = new Uint8Array(f1.length + f2.length);
-  coalesced.set(f1, 0);
-  coalesced.set(f2, f1.length);
-  stream.emitData(coalesced.slice(0, coalesced.length - 3)); // ...but withhold the last 3 bytes
-  stream.emitData(coalesced.slice(coalesced.length - 3));    // ...delivered in a second, tiny event
-
-  ok(sink.events.length === 2, `two coalesced+split frames -> exactly 2 message events (got ${sink.events.length})`);
-  ok(sink.events[0].type === 'request.end' && sink.events[0].corrId === 'r1', "kind:'res' -> 'request.end', corrId recovered after reassembly");
-  ok(sink.events[1].type === 'message.in' && sink.events[1].corrId === 'r2', "kind:'event' -> 'message.in', second frame recovered in order");
-  ok(sink.events.every((e) => e.peerId === 'explicit-peer'), 'explicit peerId override respected (not forced to intrinsic identity)');
-}
-
 // Close event
 {
   const stream = new FakeNoiseSecretStream(new Uint8Array([9, 9]));
@@ -213,6 +366,49 @@ class FakeNoiseSecretStream {
   instrumentHyperswarmStream(stream, sink);
   stream.emitClose();
   ok(sink.events.some((e) => e.type === 'conn.state' && e.event === 'close'), 'stream close tapped as conn.state/close');
+}
+
+// ---------------------------------------------------------------------------
+// (b4) framing is NOT deleted — it still governs the dedicated observability
+// channel, where this probe owns BOTH ends (exporters/hyperswarm.ts -> the
+// hub's FrameReader). This is the boundary the fix draws.
+// ---------------------------------------------------------------------------
+console.log('\n(b) exporter channel — length-prefix framing IS still applied where the probe owns both ends:\n');
+{
+  const written = [];
+  const hubStream = { write(bytes) { written.push(bytes); return true; } };
+  const exporter = createHyperswarmExporter(hubStream);
+
+  const batch = [
+    { type: 'request.start', corrId: 'e1', peerId: 'p1' },
+    { type: 'request.end', corrId: 'e2', peerId: 'p1' },
+  ];
+  exporter.export(batch);
+
+  ok(written.length === batch.length, `exporter wrote one frame per event (${written.length}/${batch.length})`);
+  ok(written.every((w) => {
+    const declared = new DataView(w.buffer, w.byteOffset, 4).getUint32(0, false);
+    return declared === w.length - 4;
+  }), 'exporter frames carry a 4-byte BE length prefix that matches the payload length exactly');
+
+  // And the receiving end reassembles them with StreamFramer under hostile
+  // chunking — the framer coverage in (a) applies to THIS channel.
+  const wire = cat(written.map(asBytes));
+  const decoded = [];
+  const framer = new StreamFramer((m) => decoded.push(JSON.parse(new TextDecoder().decode(m))));
+  for (let i = 0; i < wire.length; i += 3) framer.push(wire.slice(i, i + 3));
+  ok(decoded.length === batch.length && JSON.stringify(decoded) === JSON.stringify(batch),
+     'exporter channel: StreamFramer recovers the exact batch from a 3-byte-chunked stream (framing still load-bearing here)');
+  ok(framer.pending === 0, 'exporter channel: nothing left pending after a complete stream');
+
+  // CONTROL: the app tap and the exporter channel genuinely differ in behaviour.
+  const tapStream = new FakeNoiseSecretStream(new Uint8Array([1]));
+  instrumentHyperswarmStream(tapStream, new MemorySink());
+  const sameEvent = JSON.stringify(batch[0]);
+  tapStream.write(sameEvent);
+  ok(tapStream.writeCalls.length === 1 && asBytes(tapStream.writeCalls[0]).length === asBytes(sameEvent).length
+     && written[0].length === asBytes(sameEvent).length + 4,
+     'CONTROL: identical bytes are UNFRAMED through the app tap and FRAMED through the exporter — the two channels are not the same code path');
 }
 
 // CONTROL: disabled = genuine no-op, same guarantee proven for webrtc/websocket.

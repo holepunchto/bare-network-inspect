@@ -13,6 +13,7 @@ import type { ChannelBinding } from './identity.ts';
 import { decodeCbor } from './cbor.ts';
 import { bytesToUlid } from './ulid.ts';
 import { tolerantSelect, V1_FIELDS } from './version.ts';
+import { utf8Decode } from './utf8.ts';
 
 export interface DecodeOptions {
   encoding: EncodingId;
@@ -49,7 +50,7 @@ function requireMethods(opts: DecodeOptions): MethodRegistry {
 
 // ---- JSON -------------------------------------------------------------------
 function decodeJson<T>(bytes: Uint8Array, shortPeers: boolean, opts: DecodeOptions): P2PEnvelope<T> {
-  const raw = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) as Record<string, unknown>;
+  const raw = JSON.parse(utf8Decode(bytes, { fatal: true })) as Record<string, unknown>;
   const sel = tolerantSelect<Record<string, unknown>>(raw, V1_FIELDS);
 
   let src: PeerId; let dst: Dst;

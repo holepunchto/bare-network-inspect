@@ -22,6 +22,7 @@
 import type { EventSink, L2Event } from '../src/sink.ts';
 import { emitSafe } from '../src/sink.ts';
 import { isProbeDisabledByBuild } from './env.ts';
+import { utf8Encode } from '../../bare-protocol/src/utf8.ts';
 
 // ---------------------------------------------------------------------------
 // Wire-level helpers
@@ -32,7 +33,7 @@ export type WireData = string | ArrayBuffer | ArrayBufferView | { size: number }
 /** Best-effort byte length across the shapes send()/onmessage may carry. Never throws. */
 export function byteLength(data: unknown): number {
   try {
-    if (typeof data === 'string') return new TextEncoder().encode(data).length;
+    if (typeof data === 'string') return utf8Encode(data).length;
     if (data instanceof ArrayBuffer) return data.byteLength;
     if (ArrayBuffer.isView(data as ArrayBufferView)) return (data as ArrayBufferView).byteLength;
     if (data && typeof (data as { size?: unknown }).size === 'number') {

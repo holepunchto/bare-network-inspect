@@ -23,15 +23,11 @@ import type { Reporter } from './reporters.ts';
 import { wrapClient, setInvokeContext } from './wrap-client.ts';
 import type { Report, WrapClientOptions } from './wrap-client.ts';
 
-// Dev signal for the replay/invoke capability. RN sets globalThis.__DEV__; Node/Electron use
-// NODE_ENV. Anything else (bare/browser with neither) defaults to dev — the capability is a
-// dev tool and the consuming adapter already gates on its own dev flag before calling observe().
-const IS_DEV: boolean = (() => {
-  const g = globalThis as any;
-  if (typeof g.__DEV__ !== 'undefined') return !!g.__DEV__;
-  if (typeof g.process !== 'undefined' && g.process?.env) return g.process.env.NODE_ENV !== 'production';
-  return true;
-})();
+// NOTE: there is deliberately NO ambient "am I in dev?" signal here. The replay/invoke capability
+// used to default to a sniffed dev flag, which returned true whenever neither globalThis.__DEV__ nor
+// globalThis.process?.env existed — i.e. in a production browser bundle and in every Bare/Pear build
+// (`bare -e 'typeof process'` → undefined). A shipped app therefore installed the inbound invoke
+// handler. The capability now fails CLOSED: it requires an explicit `allowInvoke: true`.
 
 export const DEFAULT_TOPIC = 'p2p-observability-hub:v0';
 
@@ -148,14 +144,21 @@ export interface ObserveOptions {
   source?: string | Record<string, unknown>;
   /**
    * Allow the GUI to REPLAY a logged call back into this client (re-run a call the app already
-   * made). The GUI sends only a corrId; the app re-invokes its OWN stored method+args, so no
-   * method/args cross the wire and an arbitrary command can't be injected. Only meaningful with
-   * `websocket`. Default: enabled in dev (see IS_DEV), off in production. Set false to force off.
+   * made). Boundary: the GUI references a call by corrId and the METHOD is resolved from this
+   * client's own call log — it never crosses the wire, so a replay cannot be redirected to a
+   * method the app never called. The ARGS may be supplied by the GUI (edit-and-replay) and are
+   * NOT validated here beyond "must be a JSON array"; use `canReplay` to check them.
+   *
+   * Fails CLOSED: must be set to `true` EXPLICITLY. There is no dev-detection default — omit it
+   * and replay is off, so a shipped build never installs the inbound handler. Only meaningful
+   * together with `websocket`.
    */
   allowInvoke?: boolean;
   /**
    * Optional gate consulted before a replay runs — return false to block (e.g. to refuse
-   * re-running a mutating method like a send). Default: allow. Receives the logged method + args.
+   * re-running a mutating method like a send). Default: allow. Receives the logged method and the
+   * args that will actually be used — which may be UNVALIDATED, GUI-supplied args. This is the
+   * only argument check in the system, so an app whose methods mutate state should implement it.
    */
   canReplay?: (method: string, args: unknown[]) => boolean;
   /** Max logged calls retained for replay (corrId→method+args). Default 500. */
@@ -248,11 +251,14 @@ export function observe(opts: ObserveOptions = {}): ObserveHandle {
   // keeps the original for the app's own use.
   const wireSource = redactor ? redactSource(source, redactor) : source;
 
-  // --- Replay capability (dev-only, websocket-only). The GUI can re-run a call the app already
-  // made, referenced BY corrId — the app re-invokes its own stored args, so no method/args cross
-  // the wire and an arbitrary command can't be injected. Off in production (IS_DEV) or when the
-  // app sets allowInvoke:false. When off, nothing is logged and no inbound handler is installed.
-  const invokeEnabled = (opts.allowInvoke ?? IS_DEV) === true && !!opts.websocket;
+  // --- Replay capability (opt-in, websocket-only). The GUI can re-run a call the app already made,
+  // referenced BY corrId: the METHOD is looked up in this client's own call log and never comes off
+  // the wire, so a replay cannot be redirected to a method the app never called. The ARGS may be
+  // overridden by the GUI and are not validated here beyond being a JSON array — opts.canReplay is
+  // the only argument check (see handleInvoke).
+  // Fails CLOSED: `allowInvoke: true` must be passed EXPLICITLY — no dev sniffing, so a production
+  // build that forgot to strip observe() still installs no inbound handler and advertises no caps.
+  const invokeEnabled = opts.allowInvoke === true && !!opts.websocket;
   // Replay window: how many recent calls stay replayable. The GUI can show up to ~5000 rows, so a
   // small window meant an older-but-still-visible row failed with 'unknown-corrId'. 2000 covers
   // realistic "replay a call you just saw" on a chatty app while bounding memory (raw

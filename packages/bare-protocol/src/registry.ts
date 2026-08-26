@@ -9,6 +9,7 @@
 // table): entries are added on first sight during encode and looked up on decode.
 
 import type { MethodRegistry, PeerId } from './envelope.ts';
+import { utf8Encode } from './utf8.ts';
 
 export class MethodRegistryImpl implements MethodRegistry {
   private s2i = new Map<string, number>();
@@ -43,7 +44,7 @@ function fnv1a64(s: string): Uint8Array {
   let hi = 0xcbf2_9ce4 >>> 0;
   let lo = 0x8422_2325 >>> 0;
   const PRIME_LO = 0x1b3;
-  const bytes = new TextEncoder().encode(s);
+  const bytes = utf8Encode(s);
   for (const b of bytes) {
     lo ^= b;
     // 64-bit multiply by FNV prime (0x100000001b3) using 32-bit halves.

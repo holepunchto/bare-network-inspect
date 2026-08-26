@@ -14,11 +14,19 @@ const GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 // CSRF / cross-origin guard for the WS upgrade. A browser WebSocket ALWAYS sends an Origin header,
 // so this stops a random page you're visiting from opening ws://127.0.0.1:PORT and driving replay
 // (the 127.0.0.1 bind is NOT an access boundary — any local page can reach it). App reporters
-// (Node/RN, non-browser) send NO Origin and are allowed. Allowed: absent Origin, loopback Origin,
-// or same-host as the served page (covers a deliberate LAN --host bind).
-export function originAllowed(req) {
+// (Node/RN, non-browser) send NO Origin header at all and are allowed. Allowed: absent Origin,
+// loopback Origin, or same-host as the served page (covers a deliberate LAN --host bind).
+//
+// Origin: null is REJECTED. It is not a non-browser marker: a sandboxed or cross-origin-redirected
+// browsing context serializes its OPAQUE origin as exactly the string "null", so allowing it lets
+// any page a developer visits open ws://127.0.0.1:PORT inside a sandboxed iframe and read the whole
+// unredacted history, drive replay, and send __clear. Absent-Origin already covers real reporters.
+// `allowNullOrigin` exists only for a runtime whose WebSocket client genuinely sends "null"; it
+// re-opens the hole for browsers too, so it is off by default and warns loudly when on.
+export function originAllowed(req, { allowNullOrigin = false } = {}) {
   const origin = req.headers['origin'];
-  if (!origin || origin === 'null') return true;                 // non-browser client (app reporter)
+  if (!origin) return true;                                       // non-browser client (app reporter)
+  if (origin === 'null') return allowNullOrigin === true;         // opaque origin — a browser, unless opted in
   let host;
   try { host = new URL(origin).hostname; } catch { return false; } // malformed → reject
   if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]') return true;
@@ -67,7 +75,7 @@ function wsConnection(socket, onText, onClose) {
   return { send(str) { try { socket.write(encodeFrame(Buffer.from(str, 'utf8'), 0x1)); } catch {} } };
 }
 
-export function startGui({ port = 9420, demo = false, host = '127.0.0.1' } = {}) {
+export function startGui({ port = 9420, demo = false, host = '127.0.0.1', allowNullOrigin = false } = {}) {
   const DIR = dirname(fileURLToPath(import.meta.url));
   const HISTORY = [];
   const MAX_HISTORY = 2000;
@@ -97,7 +105,7 @@ export function startGui({ port = 9420, demo = false, host = '127.0.0.1' } = {})
 
   server.on('upgrade', (req, socket) => {
     if (req.url !== '/ws' || !req.headers['sec-websocket-key']) { socket.destroy(); return; }
-    if (!originAllowed(req)) { socket.destroy(); return; }   // reject cross-origin browser pages (CSRF)
+    if (!originAllowed(req, { allowNullOrigin })) { socket.destroy(); return; } // reject cross-origin browser pages (CSRF)
     const accept = createHash('sha1').update(req.headers['sec-websocket-key'] + GUID).digest('base64');
     socket.write(
       'HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n' +
@@ -127,10 +135,14 @@ export function startGui({ port = 9420, demo = false, host = '127.0.0.1' } = {})
         for (const e of HISTORY) conn.send(JSON.stringify(e));
         return;
       }
-      // A viewer replaying a logged call: route {__invoke:{corrId,target,invokeId}} to ONE live
-      // emitter for the target source — but only if that source advertised caps.invoke. The GUI
-      // never sends method/args (the app re-runs its own logged call), so a browser can at most
-      // ask an opted-in app to re-run something it already did.
+      // A viewer replaying a logged call: route {__invoke:{corrId,target,invokeId,args?}} to ONE
+      // live emitter for the target source — but only if that source advertised caps.invoke.
+      // Boundary, precisely: the METHOD is not on the wire — the app resolves it from its own log
+      // for that corrId, so a viewer cannot redirect the replay to a different method. The `args`
+      // ARE viewer-supplied (the GUI's edit-and-replay sends them) and this server does not
+      // inspect them; the app only checks that they are a JSON array. So an opted-in app can be
+      // asked to re-run a method it already called, with arbitrary arguments. The app's
+      // `canReplay(method, args)` hook is the only argument check in the system.
       if (isBrowser) {
         // A viewer purging server-side history so a Clear actually sticks across reconnect/refresh
         // (browsers replay HISTORY on connect). scope 'all' wipes everything; 'device' wipes one
@@ -176,6 +188,9 @@ export function startGui({ port = 9420, demo = false, host = '127.0.0.1' } = {})
     if (host !== '127.0.0.1' && host !== 'localhost') {
       console.log('⚠️  bound %s (not localhost): the GUI — including replay into a running dev app — is reachable from the LAN. Prefer `adb reverse`/a tunnel and keep 127.0.0.1.', host);
     }
+    if (allowNullOrigin) {
+      console.log('⚠️  allowNullOrigin: WS upgrades with `Origin: null` are accepted. A sandboxed cross-origin iframe on ANY page you visit sends exactly that origin, so it can read this GUI\'s full unredacted history, drive replay into your dev app, and clear it. Only use this for a non-browser client that insists on sending "null".');
+    }
     if (demo) startDemo(ingest);
   });
   return server;
@@ -209,8 +224,9 @@ function startDemo(emit) {
 function nowish() { return Date.now(); }
 
 // Run directly for local debugging (equivalent to the old `node tools/observe-gui/server.mjs`):
-//   node packages/bare-observe/gui/server.mjs [--port N] [--demo] [--host 0.0.0.0]
+//   node packages/bare-observe/gui/server.mjs [--port N] [--demo] [--host 0.0.0.0] [--allow-null-origin]
 // Default host is 127.0.0.1 (localhost-only). --host 0.0.0.0 opts into LAN exposure (warns).
+// --allow-null-origin re-admits `Origin: null` WS upgrades — a browser CSRF hole, off by default.
 if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
   const a = process.argv.slice(2);
   const i = a.indexOf('--port');
@@ -219,5 +235,6 @@ if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
     port: i >= 0 ? Number(a[i + 1]) : Number(process.env.OBSERVE_PORT || 9420),
     demo: a.includes('--demo'),
     host: h >= 0 ? a[h + 1] : (process.env.OBSERVE_HOST || '127.0.0.1'),
+    allowNullOrigin: a.includes('--allow-null-origin'),
   });
 }

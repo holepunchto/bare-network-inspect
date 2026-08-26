@@ -18,11 +18,16 @@ npx bare-observe init --write # apply (never overwrites existing files)
 ```js
 import { observe } from '@holepunchto/bare-network-inspect';
 
-const obs = observe({ websocket: 'ws://127.0.0.1:9420/ws' });  // reliable local-dev viewer
+const obs = observe({
+  websocket: 'ws://127.0.0.1:9420/ws',   // reliable local-dev viewer
+  allowInvoke: true,                     // opt in to GUI replay — DEV BUILDS ONLY
+})
 const client = obs.wrapClient(myRpcClient);                    // endpoint + request + response
 // subscription streams are monitored too — they show as live "streaming" rows, not "pending"
 ```
 Then run the GUI: `npx bare-observe gui` → open http://localhost:9420.
+Replay (re-running a call the app already made) is **opt-in**: it needs `allowInvoke: true`
+and a `websocket:` viewer, and belongs in dev builds only — see [USAGE.md](./USAGE.md).
 (Android: `adb reverse tcp:9420 tcp:9420` first.)
 
 **Or tap a raw transport** when there's no client:

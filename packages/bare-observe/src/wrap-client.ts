@@ -19,9 +19,11 @@ export interface WrapClientOptions {
   monitorStreams?: boolean;
   /**
    * Called with the RAW (un-previewed) args at each call site, keyed by the minted corrId.
-   * observe() uses this to keep a bounded call-log so a GUI can REPLAY a logged call by corrId
-   * (the app re-runs its OWN stored args — the wire never carries method/args, so an arbitrary
-   * command can't be injected). Dev-only path; never wired in production.
+   * observe() uses this to keep a bounded call-log so a GUI can REPLAY a logged call by corrId.
+   * The METHOD comes from this log, never from the wire, so a replay cannot be redirected to a
+   * method the app never called. ARGS, however, may be supplied by the GUI (edit-and-replay) and
+   * are not validated by this library — the app's `canReplay(method, args)` hook is the only
+   * argument check. Wired only when `allowInvoke: true` is passed explicitly.
    */
   onCall?: (corrId: string, method: string, args: unknown[]) => void;
 }

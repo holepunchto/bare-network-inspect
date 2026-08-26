@@ -1,9 +1,10 @@
 // replay.test.mjs — GUI-driven REPLAY of a logged RPC call (dev-only capability).
 // Proves: enforced replay re-runs the app's OWN logged method+args referenced by corrId; the
 // re-run is tagged origin:'gui'+replayOf with a fresh corrId; announce advertises caps.invoke.
-// Controls: unknown corrId is rejected and invokes nothing; allowInvoke:false installs NO inbound
-// handler and advertises no caps; canReplay gate blocks; the gui-tag never leaks onto a later
-// organic call. Uses an injected fake WebSocket (no real network).
+// Controls: unknown corrId is rejected and invokes nothing; allowInvoke:false AND the DEFAULT (no
+// allowInvoke at all — the capability fails closed) install NO inbound handler and advertise no
+// caps; canReplay gate blocks; the gui-tag never leaks onto a later organic call.
+// Uses an injected fake WebSocket (no real network).
 
 import { observe } from '../packages/bare-observe/src/observe.ts';
 
@@ -190,6 +191,51 @@ async function boot(obs, client) {
   await settle(); obs.flusher.flushNow();
   check('default window replays a 600-calls-old row (would fail at the old 500 cap)',
     calls.length === before + 1 && JSON.stringify(calls.at(-1)) === JSON.stringify(['first']));
+  obs.stop();
+}
+
+// ---- (J) CONTROL: the DEFAULT (no allowInvoke) fails CLOSED ----
+// The gate used to fall back to a sniffed dev flag that returned true whenever neither
+// globalThis.__DEV__ nor globalThis.process?.env existed — a production browser bundle and EVERY
+// Bare/Pear build. This case pins the default: replay is off unless allowInvoke:true is explicit.
+{
+  const calls = [];
+  const client = { core: { getVersion: (...a) => { calls.push(a); return Promise.resolve(1); } } };
+  const obs = observe({ websocket: 'ws://x/ws', source: { deviceId: 'dJ', appId: 'a' } }); // NO allowInvoke
+  const ws = await boot(obs, client);
+  check('CONTROL: default (no allowInvoke) installs NO inbound handler', ws.onmessage == null);
+  const ann = frames(ws).find((f) => f.__source);
+  check('CONTROL: default announce advertises NO caps.invoke', !!ann && !(ann.__source.caps && ann.__source.caps.invoke));
+  // Even a well-formed frame delivered straight to the socket must do nothing.
+  await client.core.getVersion('organic');
+  await settle(); obs.flusher.flushNow();
+  const start = evs(ws).find((e) => e.type === 'request.start' && e.method === 'core.getVersion');
+  const before = calls.length;
+  ws.fire({ __invoke: { corrId: start.corrId, invokeId: 'jd1', args: ['pwn'] } }); // no-op: nothing listening
+  await settle(); obs.flusher.flushNow();
+  check('CONTROL: default ignores a well-formed __invoke frame (nothing re-run)', calls.length === before);
+  check('CONTROL: default emits no invoke.error either (frame never reached the app)',
+    !evs(ws).some((e) => e.type === 'invoke.error'));
+  obs.stop();
+}
+
+// ---- (K) the DEFAULT's positive counterpart: the SAME setup + allowInvoke:true still replays ----
+// Without this, (J) could pass because replay is broken rather than because it is gated.
+{
+  const calls = [];
+  const client = { core: { getVersion: (...a) => { calls.push(a); return Promise.resolve(1); } } };
+  const obs = observe({ websocket: 'ws://x/ws', allowInvoke: true, source: { deviceId: 'dK', appId: 'a' } });
+  const ws = await boot(obs, client);
+  check('explicit allowInvoke:true installs the inbound handler', typeof ws.onmessage === 'function');
+  const ann = frames(ws).find((f) => f.__source);
+  check('explicit allowInvoke:true announce advertises caps.invoke', !!ann && ann.__source.caps?.invoke === true);
+  await client.core.getVersion('organic');
+  await settle(); obs.flusher.flushNow();
+  const start = evs(ws).find((e) => e.type === 'request.start' && e.method === 'core.getVersion');
+  const before = calls.length;
+  ws.fire({ __invoke: { corrId: start.corrId, invokeId: 'k1' } });
+  await settle(); obs.flusher.flushNow();
+  check('explicit allowInvoke:true still replays the logged call', calls.length === before + 1);
   obs.stop();
 }
 

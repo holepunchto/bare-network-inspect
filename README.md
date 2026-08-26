@@ -19,7 +19,10 @@ npm i -D @holepunchto/bare-network-inspect      # public npm, no auth
 ```
 ```js
 import { observe } from '@holepunchto/bare-network-inspect'
-const obs = observe({ websocket: 'ws://127.0.0.1:9420/ws' })   // reliable local-dev viewer
+const obs = observe({
+  websocket: 'ws://127.0.0.1:9420/ws',   // reliable local-dev viewer
+  allowInvoke: true,                     // opt in to GUI replay — DEV BUILDS ONLY
+})
 const client = obs.wrapClient(myRpcClient)                     // endpoint + request + response + streams
 ```
 ```bash

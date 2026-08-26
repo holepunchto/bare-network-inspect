@@ -11,6 +11,8 @@
 // emits the same canonical head forms, so its output length matches that floor.
 // cbor-x, if used in production instead, adds +2 B/map (see cbor-selfcheck.mjs).
 
+import { utf8Encode, utf8Decode } from './utf8.ts';
+
 type Cbor =
   | null
   | boolean
@@ -58,7 +60,7 @@ function encodeItem(v: Cbor, out: number[]): void {
     return;
   }
   if (typeof v === 'string') {
-    const bytes = new TextEncoder().encode(v);
+    const bytes = utf8Encode(v);
     writeHead(out, 3, bytes.length);
     for (const b of bytes) out.push(b);
     return;
@@ -119,7 +121,7 @@ function decodeItem(buf: Uint8Array, p: number): [Cbor, number] {
   if (major === 3) {
     const [len, np] = readLen(buf, ai, p);
     if (np + len > buf.length) throw new Error('cbor: text-string overruns buffer');
-    return [new TextDecoder('utf-8', { fatal: true }).decode(buf.slice(np, np + len)), np + len];
+    return [utf8Decode(buf.slice(np, np + len), { fatal: true }), np + len];
   }
   if (major === 4) {
     const [len, np] = readLen(buf, ai, p);

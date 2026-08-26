@@ -7,17 +7,24 @@
 // two devices on two networks are needed). What follows is verified against a FAKE
 // duplex stream that mirrors NoiseSecretStream's documented method shape
 // (`.write(buf)`, `.on('data', buf)`, `.on('close')`, `.remotePublicKey`,
-// `.writableLength`) — it proves the WRAPPER + FRAMING logic, not real
+// `.writableLength`) — it proves the WRAPPER + PASSTHROUGH logic, not real
 // on-device Hyperswarm/UDX behaviour.
 //
-// STREAM vs MESSAGE (the reason this file exists, see ../transport/framing.ts):
-// unlike WebRTC-DC/WebSocket (`send`/`onmessage` give discrete envelopes for
-// free), a NoiseSecretStream is a raw byte stream — one `.write()` on the
-// sender is NOT guaranteed to arrive as one `'data'` event on the receiver.
-// Every `'data'` chunk is pushed through a `StreamFramer` before this adapter
-// ever looks at envelope contents, so partial/coalesced reads are
-// reassembled into whole messages first. This is the ONLY structural
-// difference from adapters/webrtc.ts; the emitted L2Event shape is identical.
+// PASSTHROUGH IN BOTH DIRECTIONS — this adapter OBSERVES, it never alters the
+// application's bytes:
+//   outbound: `origWrite(data)` with the app's payload untouched;
+//   inbound:  one event per `'data'` chunk, chunk never consumed or reframed.
+// A NoiseSecretStream is a raw byte stream, so unlike WebRTC-DC/WebSocket one
+// `.write()` is not guaranteed to arrive as one `'data'` event. The tempting fix
+// — length-prefix the app's payload on write and reassemble on read (see
+// ../transport/framing.ts) — is WRONG here: it only works if BOTH peers run this
+// probe, which is not how it is exported (packages/bare-observe/src/index.ts) or
+// documented, and otherwise corrupts the app's own protocol on the remote side.
+// Consequence, accepted deliberately: an inbound event describes a CHUNK, not
+// necessarily a whole message, so `bytes` is exact but the envelope hint is
+// best-effort (present when a chunk happens to hold a decodable envelope).
+// Length-prefix framing lives ONLY on the dedicated observability channel
+// (../exporters/hyperswarm.ts), where this probe owns both ends.
 //
 // Backpressure analog: DataChannel has `.bufferedAmount`; Node/Bare duplex
 // streams have `.writableLength` (bytes queued in the internal buffer, not
@@ -35,8 +42,7 @@ import { emitSafe } from '../src/sink.ts';
 import { byteLength, bestEffortDecode } from './webrtc.ts';
 import type { EnvelopeHint, Uninstrument } from './webrtc.ts';
 import { isProbeDisabledByBuild } from './env.ts';
-import { createFramer } from '../transport/framing.ts';
-import { encodeFrame } from '../transport/framing.ts';
+import { utf8Decode } from '../../bare-protocol/src/utf8.ts';
 
 export interface MinimalDuplexStream {
   write(data: Uint8Array | string): boolean;
@@ -77,7 +83,7 @@ export function publicKeyToPeerId(key: Uint8Array | string | undefined): string 
 
 function toStringIfDecodable(bytes: Uint8Array): string | undefined {
   try {
-    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    return utf8Decode(bytes, { fatal: true });
   } catch {
     return undefined;
   }
@@ -112,22 +118,21 @@ export function instrumentHyperswarmStream(
       /* never throw from the probe */
     }
 
+    // The tap MUST NOT alter the application's bytes. `data` is handed to
+    // origWrite exactly as the app passed it: no length prefix, no re-encoding,
+    // no reordering. Framing this payload would prepend 4 bytes to the app's own
+    // protocol, and the remote peer — which is NOT required to run this probe
+    // (see packages/bare-observe/src/index.ts) — would receive [len][payload]
+    // and misparse it. Length-prefix framing belongs ONLY on the dedicated
+    // observability channel (../exporters/hyperswarm.ts), never on app data.
+    //
+    // ONLY the app's own call sits inside this try. Its catch rethrows, because
+    // a genuine transport error must reach the app — so nothing probe-internal
+    // may live here, or a probe bug would be indistinguishable from a transport
+    // failure (and would be reported to the app as one).
+    let result: boolean;
     try {
-      // Frame on the wire so the receiver's StreamFramer can reassemble
-      // message boundaries out of an arbitrarily-chunked byte stream.
-      const result = origWrite(encodeFrame(data));
-      emitSafe(sink, {
-        type: env?.kind === 'req' ? 'request.start' : 'message.out',
-        peerId,
-        bytes,
-        transport: 'hyperswarm',
-        bufferedAmount,
-        msgId: env?.msgId,
-        corrId: env?.corrId,
-        method: env?.method,
-        t: now(),
-      });
-      return result;
+      result = origWrite(data);
     } catch (err) {
       emitSafe(sink, {
         type: 'send.error',
@@ -140,16 +145,40 @@ export function instrumentHyperswarmStream(
       });
       throw err;
     }
+
+    // Probe-internal work, outside the rethrowing try. emitSafe never throws.
+    emitSafe(sink, {
+      type: env?.kind === 'req' ? 'request.start' : 'message.out',
+      peerId,
+      bytes,
+      transport: 'hyperswarm',
+      bufferedAmount,
+      msgId: env?.msgId,
+      corrId: env?.corrId,
+      method: env?.method,
+      t: now(),
+    });
+    return result;
   } as MinimalDuplexStream['write'];
 
-  const framer = createFramer('stream', (message) => {
+  // Inbound is OBSERVE-ONLY, symmetric with the outbound passthrough above.
+  // We deliberately do NOT run a length-prefix framer over the app's stream:
+  // those bytes are the application's protocol, framed however the application
+  // frames it (or not at all), and a framer here would read the app's first 4
+  // bytes as a length and desynchronise on the first chunk. So: one event per
+  // 'data' chunk, counting bytes and best-effort-decoding a hint. The chunk is
+  // never consumed, reframed, buffered or mutated, and this never throws.
+  const onData = (chunk: unknown) => {
     try {
-      const asString = toStringIfDecodable(message);
+      const bytes = byteLength(chunk);
+      const asString = typeof chunk === 'string'
+        ? chunk
+        : chunk instanceof Uint8Array ? toStringIfDecodable(chunk) : undefined;
       const env = decodeEnvelope(asString);
       emitSafe(sink, {
         type: env?.kind === 'res' ? 'request.end' : 'message.in',
         peerId,
-        bytes: message.length,
+        bytes,
         transport: 'hyperswarm',
         msgId: env?.msgId,
         corrId: env?.corrId,
@@ -158,14 +187,6 @@ export function instrumentHyperswarmStream(
         hlc: env?.hlc,
         t: now(),
       });
-    } catch {
-      /* never throw from the probe */
-    }
-  });
-
-  const onData = (chunk: unknown) => {
-    try {
-      framer.push(chunk as Uint8Array);
     } catch {
       /* never throw from the probe */
     }

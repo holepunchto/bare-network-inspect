@@ -19,10 +19,12 @@
 // is silently correct until the first fragmented read, then produces
 // corrupted/misaligned messages — see the CONTROL case in the test.
 
+import { utf8Encode } from '../../bare-protocol/src/utf8.ts';
+
 const LENGTH_PREFIX_BYTES = 4;
 
 function toUint8Array(data: Uint8Array | ArrayBuffer | string): Uint8Array {
-  if (typeof data === 'string') return new TextEncoder().encode(data);
+  if (typeof data === 'string') return utf8Encode(data);
   if (data instanceof Uint8Array) return data;
   return new Uint8Array(data);
 }

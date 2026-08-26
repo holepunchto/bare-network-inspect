@@ -45,6 +45,36 @@ When there's no RPC client, tap the transport bytes directly:
 | `stream: <duplex>` | a hub connection you provide | on | you already hold a hub socket |
 | *(none)* | Bare/Pear → auto-dial the Hyperswarm hub; else buffer + `attach()` | on | multi-peer / field P2P |
 
+| Capability | Default | Notes |
+|---|---|---|
+| `allowInvoke: true` | **off** | Enables GUI replay. Requires a `websocket:` viewer. Dev builds only. |
+| `canReplay(method, args)` | allow all | The only check on GUI-supplied replay arguments. |
+
+### Replay is opt-in (off by default)
+
+The GUI can re-run a call your app already made. That is an **inbound execution surface**, so it
+is off unless you ask for it, in a dev build only:
+
+```js
+const obs = observe({
+  websocket: 'ws://127.0.0.1:9420/ws',
+  allowInvoke: true,        // dev builds ONLY — never ship this
+  canReplay: (method, args) => method.startsWith('read.'),   // your own gate, see below
+})
+```
+
+It used to default on whenever no production signal was detectable — which is exactly what a
+browser or Bare/Pear bundle looks like, so a shipped release could carry the surface. It now
+requires the explicit flag.
+
+What the boundary actually is, precisely:
+
+- **The method is safe.** It is resolved from your app's own call log by `corrId` and never
+  crosses the wire, so a crafted frame cannot name a method your app did not already call.
+- **The arguments are not.** The GUI's "Edit & replay" sends caller-supplied args, and the
+  library checks only that they are a JSON array. **`canReplay(method, args)` is the only
+  argument check in the system** — if a replayable method mutates state, implement it.
+
 Redaction is the choke point before data leaves the device — hashes peer ids, strips URL
 tokens, summarises bodies. It defaults **on** for export paths and **off** for the local
 `websocket` viewer. Force either with `redact: true|false`.

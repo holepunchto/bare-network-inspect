@@ -13,6 +13,7 @@
 // UNVERIFIABLE HERE (no RN toolchain/device, C15/C17). The wire contract below is verified.
 
 import { encodeFrame } from '../transport/framing.ts';
+import { utf8Encode } from '../../bare-protocol/src/utf8.ts';
 
 /** Minimal duplex-write surface. NoiseSecretStream / TCP socket / any Node duplex satisfies it. */
 export interface WritableStreamLike {
@@ -27,7 +28,7 @@ export interface HyperswarmExporterOptions {
 }
 
 const jsonEncode = (event: unknown): Uint8Array =>
-  new TextEncoder().encode(JSON.stringify(event));
+  utf8Encode(JSON.stringify(event));
 
 export interface HyperswarmExporter {
   /** Frame-and-write one flushed batch. Wire this as BatchFlusher's `onFlush`. */

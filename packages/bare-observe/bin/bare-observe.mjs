@@ -62,9 +62,18 @@ if (cmd === 'init') {
 } else if (cmd === 'gui') {
   const i = args.indexOf('--port');
   const port = i >= 0 ? Number(args[i + 1]) : Number(process.env.OBSERVE_PORT || 9420);
+  const hostIdx = args.indexOf('--host');
   const { startGui } = await import('../gui/server.mjs');
-  startGui({ port, demo: args.includes('--demo') });
+  startGui({
+    port,
+    demo: args.includes('--demo'),
+    ...(hostIdx >= 0 ? { host: args[hostIdx + 1] } : {}),
+    // Escape hatch for a runtime whose WebSocket really does send `Origin: null`. Off by default:
+    // 'null' is a BROWSER value (a sandboxed or redirected page), so allowing it lets any page the
+    // developer visits read the capture and drive replay.
+    allowNullOrigin: args.includes('--allow-null-origin'),
+  });
 } else {
-  console.log('Usage: bare-observe <init [--write] | gui [--port N] [--demo]>');
+  console.log('Usage: bare-observe <init [--write] | gui [--port N] [--host H] [--demo] [--allow-null-origin]>');
   process.exit(cmd ? 1 : 0);
 }

@@ -15,6 +15,7 @@ import type { ChannelBinding } from './identity.ts';
 import { assertIdentityDropAllowed } from './identity.ts';
 import { encodeCbor } from './cbor.ts';
 import { ulidToBytes } from './ulid.ts';
+import { utf8Encode } from './utf8.ts';
 
 export interface EncodeOptions {
   encoding: EncodingId;
@@ -76,7 +77,7 @@ function encodeJson<T>(env: P2PEnvelope<T>, shortPeers: boolean, peers: PeerRegi
     o.src = shortPeers ? peers!.handleFor(env.src) : env.src;
     o.dst = shortPeers ? peers!.handleFor(env.dst) : env.dst;
   }
-  return new TextEncoder().encode(JSON.stringify(o));
+  return utf8Encode(JSON.stringify(o));
 }
 
 // ---- CBOR tiers -------------------------------------------------------------

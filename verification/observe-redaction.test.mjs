@@ -1,6 +1,13 @@
-// Proves the G2 gap is CLOSED: observe() redacts on the export path by default, so raw
-// peer ids / signalling tokens / bodies never reach the exporter (hub / .p2plog). The
-// CONTROL (redact:false) shows the same data leaks unredacted — redaction is load-bearing.
+// Proves redaction is CLOSED on the export path: observe() redacts by default, so raw peer ids,
+// signalling tokens and payloads never reach the exporter (hub / .p2plog). The CONTROL
+// (redact:false) shows the same data leaking unredacted — redaction is load-bearing.
+//
+// The second half is the part that matters. This suite used to assert ONLY on a hand-built row
+// carrying a `body` key — a key NO producer in this repo ever emits. It therefore passed while
+// every real RPC argument and response shipped in the clear, and it was twice cited as proof that
+// bodies were summarised. So: drive a REAL wrapClient call and assert the literal secret string is
+// absent from the serialized bytes. Asserting on the raw bytes rather than on a field name is
+// deliberate — it keeps this test meaningful when a producer adds a fourth payload key.
 
 import { observe } from '../packages/bare-observe/src/observe.ts';
 import { StreamFramer } from '../packages/bare-probe/transport/framing.ts';
@@ -17,7 +24,8 @@ const collect = () => {
   let wire = new Uint8Array(0);
   return {
     stream: { write(b) { const n = new Uint8Array(wire.length + b.length); n.set(wire); n.set(b, wire.length); wire = n; return true; } },
-    first() { let out = []; new StreamFramer((m) => out.push(JSON.parse(new TextDecoder().decode(m)))).push(wire); return out[0]; },
+    first() { return this.all()[0]; },
+    all() { const out = []; new StreamFramer((m) => out.push(JSON.parse(new TextDecoder().decode(m)))).push(wire); return out; },
   };
 };
 
@@ -54,6 +62,77 @@ const rawOut = off.first();
 check('CONTROL: redactor null when redact:false', obs2.redactor === null);
 check('CONTROL: raw peerId reaches exporter when OFF', rawOut.peerId === RAW_PEER, rawOut.peerId);
 check('CONTROL: token-bearing URL reaches exporter when OFF', rawOut.url === RAW_URL && JSON.stringify(rawOut).includes('SUPERSECRET'));
+
+
+// ---------------------------------------------------------------------------
+// The real producer path: wrapClient emits args / response / item, NOT `body`.
+// ---------------------------------------------------------------------------
+const SECRET_ARG = 'MY-PRIVATE-MESSAGE-TEXT';
+const SECRET_RESP = 'RESPONSE-SECRET-TOKEN';
+const SECRET_ITEM = 'STREAM-ITEM-SECRET';
+
+const makeClient = () => ({
+  chat: {
+    send: async (_room, _text) => ({ ok: true, secretToken: SECRET_RESP }),
+  },
+});
+
+// --- default (hub path): redaction ON ---
+const wc = collect();
+const obs3 = observe({ stream: wc.stream, autoSwarm: false });
+const client = obs3.wrapClient(makeClient());
+await client.chat.send('room-1', SECRET_ARG);
+obs3.flusher.flushNow();
+obs3.stop();
+const wireText = JSON.stringify(wc.all());
+
+check('wrapClient ARGS do not reach the exporter raw', !wireText.includes(SECRET_ARG),
+  wireText.slice(0, 200));
+check('wrapClient RESPONSE does not reach the exporter raw', !wireText.includes(SECRET_RESP),
+  wireText.slice(0, 200));
+
+const startRow = wc.all().find((r) => r.type === 'request.start');
+const endRow = wc.all().find((r) => r.type === 'request.end');
+check('args summarised to byteLength/hash/shape', !!startRow && startRow.args
+  && typeof startRow.args === 'object' && 'byteLength' in startRow.args,
+  JSON.stringify(startRow && startRow.args));
+check('response summarised to byteLength/hash/shape', !!endRow && endRow.response
+  && typeof endRow.response === 'object' && 'byteLength' in endRow.response,
+  JSON.stringify(endRow && endRow.response));
+// The timeline must survive redaction — a summarised row is still a usable row.
+check('endpoint + corrId + duration still present', !!startRow && startRow.method === 'chat.send'
+  && !!startRow.corrId && !!endRow && typeof endRow.dur === 'number');
+
+// --- stream.data carries `item` on the same path ---
+const sc = collect();
+const obs4 = observe({ stream: sc.stream, autoSwarm: false });
+const streamClient = obs4.wrapClient({
+  notes: {
+    subscribe: () => {
+      const handlers = {};
+      const st = { on: (ev, fn) => { handlers[ev] = fn; return st; } };
+      setTimeout(() => handlers.data && handlers.data({ text: SECRET_ITEM }), 0);
+      return st;
+    },
+  },
+});
+streamClient.notes.subscribe();
+await new Promise((r) => setTimeout(r, 10));
+obs4.flusher.flushNow();
+obs4.stop();
+check('stream.data ITEM does not reach the exporter raw',
+  !JSON.stringify(sc.all()).includes(SECRET_ITEM), JSON.stringify(sc.all()).slice(0, 200));
+
+// --- CONTROL: the same call with redaction OFF must leak, or the assertions above are vacuous ---
+const wcOff = collect();
+const obs5 = observe({ stream: wcOff.stream, autoSwarm: false, redact: false });
+const clientOff = obs5.wrapClient(makeClient());
+await clientOff.chat.send('room-1', SECRET_ARG);
+obs5.flusher.flushNow();
+obs5.stop();
+const offText = JSON.stringify(wcOff.all());
+check('CONTROL: args DO reach the exporter when redact:false', offText.includes(SECRET_ARG));
+check('CONTROL: response DOES reach the exporter when redact:false', offText.includes(SECRET_RESP));
 
 console.log(failures === 0 ? '\nAll observe-redaction claims verified.' : `\n${failures} claim(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);
