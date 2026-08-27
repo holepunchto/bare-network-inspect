@@ -1,0 +1,61 @@
+{
+  "name": "@holepunchto/bare-network-inspect",
+  "version": "0.1.8",
+  "description": "Network inspector for Bare, Pear, and React Native P2P/hrpc apps. Tap an RPC client or a raw transport with one call and read endpoint, request, response, latency, and live subscription streams in a local GUI (`npx bare-observe gui`) — or omit the GUI and merge multi-peer timelines over a Hyperswarm hub. Auto-detects the runtime (React Native via bare-kit worklets, Pear/Bare, Electron/Node, browser); redacts peer ids, URL tokens, and bodies on export by default.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.6"
+  },
+  "main": "./dist/index.js",
+  "bin": {
+    "bare-observe": "bin/bare-observe.mjs"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./detect": "./dist/detect.js",
+    "./observe": "./dist/observe.js"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "gui",
+    "src/init.mjs",
+    "README.md",
+    "USAGE.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "esbuild src/index.ts src/detect.ts src/observe.ts --bundle --format=esm --platform=neutral --external:hyperswarm --external:hypercore-crypto --outdir=dist",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/holepunchto/bare-network-inspect.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "hypercore-crypto": "^3.0.0",
+    "hyperswarm": "^4.0.0",
+    "react-native-bare-kit": "*"
+  },
+  "peerDependenciesMeta": {
+    "hyperswarm": {
+      "optional": true
+    },
+    "hypercore-crypto": {
+      "optional": true
+    },
+    "react-native-bare-kit": {
+      "optional": true
+    }
+  },
+  "sideEffects": false,
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

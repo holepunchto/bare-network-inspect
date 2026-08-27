@@ -1,0 +1,33 @@
+{
+  "name": "@holepunchto/bare-probe",
+  "version": "0.0.0",
+  "description": "Internal (unpublished) L1+L2 engine behind @holepunchto/bare-network-inspect. core/ = ring buffer, correlator, sampler, batch flusher, ingestion sink, central redactor; clock/ = hybrid logical clock + offset/skew estimation for the multi-peer timeline; adapters/ = transport taps (WebRTC, WebSocket, Hyperswarm); transport/ = length-prefixed framing + per-transport capability contract. Consumed by relative import, not from a registry.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.6"
+  },
+  "exports": {
+    ".": {
+      "types": "./core/index.ts",
+      "default": "./core/index.ts"
+    },
+    "./ring-buffer": "./core/ring-buffer.ts",
+    "./correlator": "./core/correlator.ts",
+    "./sampler": "./core/sampler.ts",
+    "./flush": "./core/flush.ts",
+    "./core-sink": "./core/sink.ts",
+    "./clock": {
+      "types": "./clock/index.ts",
+      "default": "./clock/index.ts"
+    },
+    "./sink": "./src/sink.ts",
+    "./adapters/webrtc": "./adapters/webrtc.ts",
+    "./adapters/websocket": "./adapters/websocket.ts"
+  },
+  "files": ["core", "clock", "src", "adapters"],
+  "sideEffects": false,
+  "dependencies": {
+    "@holepunchto/bare-protocol": "workspace:*"
+  },
+  "license": "Apache-2.0"
+}

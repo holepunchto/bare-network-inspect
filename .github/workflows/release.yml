@@ -1,0 +1,126 @@
+# Publish the repo's packages (@holepunchto/bare-network-inspect) to the PUBLIC npm registry
+# (registry.npmjs.org). Needs an NPM_TOKEN repo secret — an npm *automation* token, which bypasses
+# 2FA in CI — with publish rights on the @holepunchto scope. The verification gate runs first: a red
+# suite blocks the publish.
+#
+# TWO WAYS TO RELEASE:
+#   1. Push a version tag (as before):
+#        git tag v0.1.7 && git push origin v0.1.7
+#   2. Manually from the Actions tab → "release" → "Run workflow" (workflow_dispatch):
+#        pick `package` (all | bare_observe), and optionally tick `create_tag`
+#        to also cut a git tag + GitHub Release from the current package.json version.
+#      Use this when the version bump is already merged to main and you'd rather click a button
+#      than push a tag locally.
+#
+# Each package publishes from its OWN package.json version, independent of any tag string.
+# Publishing is IDEMPOTENT: a package whose version is already on the registry is SKIPPED, not
+# failed — so releasing one package never fails on another's unchanged version, and re-running is
+# safe. NOTE: this workflow does NOT bump versions (main is protected) — bump via a PR first, then
+# release. A tag created here via GITHUB_TOKEN does not re-trigger the tag-push run (GitHub blocks
+# recursive GITHUB_TOKEN triggers), so there's no double publish.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Which package to publish'
+        type: choice
+        default: all
+        options:
+          - all
+          - bare_observe
+      create_tag:
+        description: 'Also create a git tag + GitHub Release from the current bare_observe version'
+        type: boolean
+        default: false
+      tag:
+        description: 'Tag name to create (optional; defaults to v<bare_observe version>). Only used if create_tag is ticked.'
+        type: string
+        default: ''
+
+permissions:
+  contents: write      # write needed only for the optional tag/release step; read would suffice otherwise
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          # scope matters: WITHOUT it setup-node sets the DEFAULT registry, which would send public
+          # deps (esbuild) to the scoped registry too. With it, only @holepunchto is mapped.
+          scope: '@holepunchto'
+
+      - name: Verification gate (blocks publish if red)
+        run: bash verification/run-all.sh
+
+      - name: Resolve target package dirs
+        id: pick
+        env:
+          EVENT: ${{ github.event_name }}
+          PACKAGE: ${{ inputs.package }}      # empty on tag-push; a choice value on dispatch
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = "workflow_dispatch" ] && [ -n "$PACKAGE" ] && [ "$PACKAGE" != "all" ]; then
+            case "$PACKAGE" in
+              bare_observe) DIRS="packages/bare-observe" ;;
+              *) echo "unknown package: $PACKAGE" >&2; exit 1 ;;
+            esac
+          else
+            DIRS="packages/bare-observe"
+          fi
+          echo "dirs=$DIRS" >> "$GITHUB_OUTPUT"
+          echo "publishing: $DIRS"
+
+      - name: Install build deps + publish (idempotent, per package)
+        env:
+          DIRS: ${{ steps.pick.outputs.dirs }}
+          # No .npmrc is committed — auth comes solely from setup-node's generated config, which
+          # reads NODE_AUTH_TOKEN. This must be the npm automation token, NOT the GitHub token.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -uo pipefail
+          publish_pkg() {
+            dir="$1"
+            echo "::group::publish $dir"
+            ( cd "$dir" && npm install --no-save ) || { echo "install failed for $dir"; echo "::endgroup::"; return 1; }
+            # prepublishOnly builds dist/; publishConfig sets access:public for the scoped name.
+            out=$( cd "$dir" && npm publish 2>&1 ); rc=$?
+            echo "$out"
+            if [ $rc -eq 0 ]; then
+              echo "published $dir"
+            elif echo "$out" | grep -qiE "cannot publish over|previously published|already exists|409"; then
+              echo "version already on registry — skipping $dir (not an error)"
+            else
+              echo "publish failed for $dir"; echo "::endgroup::"; return 1
+            fi
+            echo "::endgroup::"
+          }
+          for d in $DIRS; do publish_pkg "$d" || exit 1; done
+
+      - name: Create git tag + GitHub Release (manual dispatch, opt-in)
+        if: github.event_name == 'workflow_dispatch' && inputs.create_tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_INPUT: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          TAG="$TAG_INPUT"
+          if [ -z "$TAG" ]; then
+            TAG="v$(jq -r .version packages/bare-observe/package.json)"   # jq is preinstalled on GitHub-hosted runners
+          fi
+          if git ls-remote --tags origin "refs/tags/$TAG" | grep -q "refs/tags/$TAG"; then
+            echo "tag $TAG already exists on origin — skipping tag/release (publish above already ran)"
+          else
+            # gh release create makes the tag AND the GitHub Release at the current commit.
+            gh release create "$TAG" --title "$TAG" --target "$GITHUB_SHA" \
+              --notes "Automated release via workflow_dispatch (package: ${{ inputs.package }})."
+            echo "created tag + release $TAG"
+          fi
