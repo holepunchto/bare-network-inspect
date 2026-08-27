@@ -32,6 +32,7 @@ run "inflight.test.mjs (handle.inflight() tracks in-flight req/resp calls)" "nod
 run "ws-reporter.test.mjs (WebSocket dev-viewer transport)" "node ws-reporter.test.mjs"
 run "source.test.mjs (source id injectivity + redaction)" "node source.test.mjs"
 run "replay.test.mjs (GUI replay: enforced by corrId + gating + controls)" "node replay.test.mjs"
+run "gui-xss.test.mjs (no wire field reaches innerHTML unescaped)" "node gui-xss.test.mjs"
 run "origin-guard.test.mjs (WS upgrade rejects cross-origin pages)" "node origin-guard.test.mjs"
 run "testnet-capture.test.mjs (multi-peer capture; SKIPs w/o deps or udx)" "node testnet-capture.test.mjs"
 run "tarball-cli.test.mjs (PUBLISHED artifact resolves + bin survives npm)" "node tarball-cli.test.mjs"
