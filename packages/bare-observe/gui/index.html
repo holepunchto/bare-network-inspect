@@ -498,6 +498,13 @@
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = (v) => { try { return esc(JSON.stringify(v, null, 2)); } catch { return esc(String(v)); } };
   const time = (t) => new Date(t).toLocaleTimeString('en-GB', { hour12:false }) + '.' + String(t % 1000).padStart(3,'0');
+  // Numeric-by-convention wire fields (dur, count, lag, …). Nothing validates them: they arrive
+  // from whatever reporter is connected, and they were interpolated into innerHTML WITHOUT esc()
+  // precisely because "it's a number". A reporter sending dur:'<img src=x onerror=…>' therefore got
+  // script execution in this page — CodeQL js/xss, confirmed with a working PoC. So: a real finite
+  // number renders as itself; anything else renders as ESCAPED TEXT rather than being dropped,
+  // because silently hiding malformed data would be its own kind of lie in an inspector.
+  const num = (v) => (v == null ? '' : (typeof v === 'number' && Number.isFinite(v) ? String(v) : esc(String(v))));
 
   // --- Collapsible JSON tree. Every key/value is esc()'d (same XSS rule as fmt). Objects/arrays
   // become foldable <details>; primitives are plain rows. `path` keys the fold state so a live
@@ -748,7 +755,7 @@
       const replayBadge = r.origin === 'gui' ? `<span class="gui-badge" title="replayed from the GUI">↩ gui</span> ` : '';
       tr.innerHTML = `<td>${time(r.t)}</td><td class="ep">${replayBadge}${esc(r.method ?? '?')}</td>`
         + `<td>${statusPill(r.status)}</td>`
-        + `<td class="num">${r.dur ?? ''}</td><td class="num">${esc(respSize)}</td>`;
+        + `<td class="num">${num(r.dur)}</td><td class="num">${esc(respSize)}</td>`;
       tr.onclick = () => { selected = id; foldState.clear(); editDraft = null; render(); showDetail(r, true); }; // new request → fresh folds/edit
       rowsEl.appendChild(tr); shown++;
     }
@@ -810,7 +817,7 @@
       if (isSelection) detailEl.scrollTop = 0;
       return;
     }
-    const extra = `${r.dur != null ? ' · ' + r.dur + ' ms' : ''}${r.count != null ? ' · ' + r.count + ' msgs' : ''}`;
+    const extra = `${r.dur != null ? ' · ' + num(r.dur) + ' ms' : ''}${r.count != null ? ' · ' + num(r.count) + ' msgs' : ''}`;
     const guiBadge = r.origin === 'gui' ? `<span class="gui-badge" title="GUI replay of ${esc(r.replayOf || '?')}">↩ gui${r.replayOf ? ' · replay of ' + esc(r.replayOf) : ''}</span>` : '';
     // Replay is offered only for a source that advertised caps.invoke (a dev build with the
     // capability on). Sends nothing but the corrId — the app re-runs its own logged call.
@@ -837,7 +844,7 @@
       const items = r.items.slice(-40);
       const ordered = streamNewestFirst ? items.slice().reverse() : items;
       const toggle = `<span id="streamOrder" class="ord-toggle" title="toggle newest-first / newest-last">${streamNewestFirst ? 'Newest ↑' : 'Newest ↓'}</span>`;
-      html += `<h2>Stream responses (${r.count || 0})${toggle}</h2>`;
+      html += `<h2>Stream responses (${num(r.count ?? 0)})${toggle}</h2>`;
       html += ordered.length
         ? ordered.map((it) => `<div class="j-item"><div class="j-count">#${esc(String(it.seq))} · ${time(it.t)}</div>${jsonTree(it.item, 's' + it.seq)}</div>`).join('')
         : `<pre>(subscribed — waiting for data…)</pre>`;
