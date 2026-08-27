@@ -15,8 +15,13 @@
 # Each package publishes from its OWN package.json version, independent of any tag string.
 # Publishing is IDEMPOTENT: a package whose version is already on the registry is SKIPPED, not
 # failed — so releasing one package never fails on another's unchanged version, and re-running is
-# safe. NOTE: this workflow does NOT bump versions (main is protected) — bump via a PR first, then
-# release. A tag created here via GITHUB_TOKEN does not re-trigger the tag-push run (GitHub blocks
+# safe.
+#
+# VERSION BUMPS HAPPEN HERE. Run the workflow with `bump` = patch | minor | major and it will bump
+# packages/bare-observe/package.json, commit that to main, tag it, push both, and publish the new
+# version. `bump: none` (the default) publishes whatever version main already carries, which is what
+# a tag push does too. Requires main to be unprotected, or the push step will 403 — see the
+# `bump` step for the alternative if that changes. A tag created here via GITHUB_TOKEN does not re-trigger the tag-push run (GitHub blocks
 # recursive GITHUB_TOKEN triggers), so there's no double publish.
 name: release
 
@@ -25,6 +30,15 @@ on:
     tags: ['v*']
   workflow_dispatch:
     inputs:
+      bump:
+        description: 'Version bump to apply to main before publishing'
+        type: choice
+        default: none
+        options:
+          - none
+          - patch
+          - minor
+          - major
       package:
         description: 'Which package to publish'
         type: choice
@@ -41,6 +55,12 @@ on:
         type: string
         default: ''
 
+# Two runs bumping at once would race on the version and on the push. Queue them instead of
+# cancelling: a half-finished release (bumped + pushed, not published) is worse than a slow one.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 permissions:
   contents: write      # write needed only for the optional tag/release step; read would suffice otherwise
 
@@ -49,6 +69,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # the bump step pushes a commit + tag, so it needs real history and kept credentials
+          fetch-depth: 0
+          persist-credentials: true
 
       - uses: actions/setup-node@v4
         with:
@@ -60,6 +84,48 @@ jobs:
 
       - name: Verification gate (blocks publish if red)
         run: bash verification/run-all.sh
+
+      - name: Bump version on main (workflow_dispatch only)
+        id: bump
+        if: github.event_name == 'workflow_dispatch' && inputs.bump != 'none'
+        env:
+          BUMP: ${{ inputs.bump }}
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          # A tag ref has no branch to commit to. Refuse rather than produce a detached-HEAD commit
+          # that goes nowhere and leaves the tag and the registry disagreeing.
+          case "$REF" in
+            refs/heads/*) BRANCH="${REF#refs/heads/}" ;;
+            *) echo "::error::bump requires a branch ref, got $REF. Re-run this workflow from a branch (usually main)." ; exit 1 ;;
+          esac
+
+          cd packages/bare-observe
+          OLD="$(node -p "require('./package.json').version")"
+          # --no-git-tag-version: npm must not tag here. We tag once, below, after the commit, so the
+          # tag always points at the commit that actually carries the new version.
+          npm version "$BUMP" --no-git-tag-version >/dev/null
+          NEW="$(node -p "require('./package.json').version")"
+          cd - >/dev/null
+          echo "$OLD -> $NEW ($BUMP)"
+
+          if git rev-parse -q --verify "refs/tags/v$NEW" >/dev/null || git ls-remote --exit-code --tags origin "v$NEW" >/dev/null 2>&1; then
+            echo "::error::tag v$NEW already exists. Someone released it already, or the bump is wrong."
+            exit 1
+          fi
+
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add packages/bare-observe/package.json packages/bare-observe/package-lock.json
+          git commit -m "release: v$NEW"
+          git tag -a "v$NEW" -m "v$NEW"
+          # Push the commit FIRST: if the tag landed and the commit did not, the tag would point at a
+          # commit nobody else has.
+          git push origin "HEAD:refs/heads/$BRANCH"
+          git push origin "refs/tags/v$NEW"
+
+          echo "version=$NEW" >> "$GITHUB_OUTPUT"
+          echo "::notice::bumped $OLD -> $NEW, committed to $BRANCH and tagged v$NEW"
 
       - name: Resolve target package dirs
         id: pick
@@ -114,12 +180,21 @@ jobs:
           set -euo pipefail
           TAG="$TAG_INPUT"
           if [ -z "$TAG" ]; then
+            # After a bump, package.json on disk already carries the NEW version, so this picks it up.
             TAG="v$(jq -r .version packages/bare-observe/package.json)"   # jq is preinstalled on GitHub-hosted runners
           fi
           if git ls-remote --tags origin "refs/tags/$TAG" | grep -q "refs/tags/$TAG"; then
-            echo "tag $TAG already exists on origin — skipping tag/release (publish above already ran)"
+            # The bump step already created and pushed this tag. Do NOT re-tag — but a tag without a
+            # GitHub Release is easy to miss, so fill in the Release from the existing tag.
+            if gh release view "$TAG" >/dev/null 2>&1; then
+              echo "tag $TAG and its release already exist — nothing to do"
+            else
+              gh release create "$TAG" --title "$TAG" --verify-tag \
+                --notes "Automated release via workflow_dispatch (package: ${{ inputs.package }}, bump: ${{ inputs.bump }})."
+              echo "tag $TAG existed; created the missing GitHub Release for it"
+            fi
           else
-            # gh release create makes the tag AND the GitHub Release at the current commit.
+            # No bump happened, so tag the commit this run checked out.
             gh release create "$TAG" --title "$TAG" --target "$GITHUB_SHA" \
               --notes "Automated release via workflow_dispatch (package: ${{ inputs.package }})."
             echo "created tag + release $TAG"
