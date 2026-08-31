@@ -1,5 +1,6 @@
 {
   "name": "@holepunchto/bare-protocol",
+  "private": true,
   "version": "0.0.0",
   "description": "Internal (unpublished) L0 wire contract shared by every layer of @holepunchto/bare-network-inspect: the frozen P2PEnvelope, four selectable encodings, adjacent-version negotiation, the identity-drop guard, and the peer/ULID registries. Consumed by relative import, not from a registry.",
   "type": "module",
@@ -18,7 +19,9 @@
     "./identity": "./src/identity.ts",
     "./registry": "./src/registry.ts"
   },
-  "files": ["src"],
+  "files": [
+    "src"
+  ],
   "sideEffects": false,
   "license": "Apache-2.0"
 }

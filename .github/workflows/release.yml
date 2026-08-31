@@ -83,6 +83,24 @@ jobs:
       - name: Verification gate (blocks publish if red)
         run: bash verification/run-all.sh
 
+      # Fail on missing/bad npm auth BEFORE the bump writes a commit and a tag. Without this the
+      # last run got all the way to `npm publish`, hit ENEEDAUTH, and only stopped there — with
+      # `bump: patch` that would have left main bumped and tagged for a version that never shipped.
+      - name: Preflight — npm auth
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -uo pipefail
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "::error::NPM_TOKEN secret is not set. Create an npm AUTOMATION token (bypasses 2FA in CI) with publish rights on @holepunchto, then: gh secret set NPM_TOKEN"
+            exit 1
+          fi
+          if ! who=$(npm whoami --registry=https://registry.npmjs.org 2>&1); then
+            echo "::error::npm rejected the token: ${who}"
+            exit 1
+          fi
+          echo "authenticated to npmjs as: ${who}"
+
       - name: Bump version on main (workflow_dispatch only)
         id: bump
         if: github.event_name == 'workflow_dispatch' && inputs.bump != 'none'
