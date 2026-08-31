@@ -1,22 +1,14 @@
 name: "bare-network-inspect CodeQL config"
 
-# Queries: default + security-extended. This repo publishes a tool that taps live traffic and
-# renders it in a browser page, so the extra XSS/injection coverage is worth the extra runtime —
-# security-extended is what would have caught the gui/index.html js/xss earlier.
+# security-extended is the suite that catches the XSS class this GUI is exposed to.
 queries:
   - uses: security-extended
 
 paths-ignore:
-  # Build output. dist/ is esbuild's bundle of src/, so analysing it re-reports every finding a
-  # second time against unreadable minified-ish code.
+  # Generated: dist/ is esbuild's bundle of src/, so analysing it re-reports every finding twice.
   - "**/dist/**"
   - "**/node_modules/**"
   - "**/*.bundle.js"
-
-  # The GUI is a single self-contained page with inline <script>. It IS analysed (that is where the
-  # js/xss came from) — listed here only as a reminder that it must never be excluded to silence a
-  # finding. Deliberately commented out, not active.
-  # - "packages/bare-observe/gui/index.html"
-
-  # Vendored/generated lockfiles carry no analysable logic.
   - "**/package-lock.json"
+  # NOTE: packages/bare-observe/gui/index.html is deliberately NOT excluded — that is where the
+  # js/xss came from, and it must never be excluded to silence a finding.

@@ -498,22 +498,11 @@
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = (v) => { try { return esc(JSON.stringify(v, null, 2)); } catch { return esc(String(v)); } };
   const time = (t) => new Date(t).toLocaleTimeString('en-GB', { hour12:false }) + '.' + String(t % 1000).padStart(3,'0');
-  // Numeric-by-convention wire fields (dur, count, lag, …). Nothing validates them: they arrive
-  // from whatever reporter is connected, and they were once interpolated into innerHTML WITHOUT
-  // esc() precisely because "it's a number". A reporter sending dur:'<img src=x onerror=…>' got
-  // script execution in this page — CodeQL js/xss, confirmed with a working PoC.
-  //
-  // ALWAYS escapes, with no "is it already a number?" fast path. Two reasons, and the second is why
-  // the first version of this fix did not close the alert:
-  //   1. It is free. esc() touches only & < > " ' — none of which occur in any numeric form, so
-  //      42, -1.5, 1e+21, NaN and Infinity all come out byte-identical (verified).
-  //   2. A CONDITIONAL sanitizer is invisible to static analysis. The earlier
-  //      `typeof v === 'number' ? String(v) : esc(String(v))` left a real, if unreachable, path
-  //      where tainted input reached the DOM via String(v), and CodeQL rightly kept reporting it —
-  //      it cannot know the typeof guard makes that branch safe. An unconditional escape is both
-  //      simpler and provable.
-  // Malformed input therefore renders as escaped TEXT rather than being dropped: silently hiding
-  // bad data would be its own kind of lie in an inspector.
+  // Numeric-by-convention wire fields (dur, count, lag, …). Nothing validates their type, and
+  // interpolating them raw let dur:'<img src=x onerror=…>' execute script here (CodeQL js/xss).
+  // Escapes UNCONDITIONALLY: esc() cannot alter any numeric form (42, -1.5, 1e+21, NaN all come
+  // out identical), and a conditional sanitiser leaves a String(v) path static analysis must
+  // treat as tainted — which is why the first version of this fix did not close the alert.
   const num = (v) => (v == null ? '' : esc(String(v)));
 
   // --- Collapsible JSON tree. Every key/value is esc()'d (same XSS rule as fmt). Objects/arrays
