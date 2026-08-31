@@ -18,8 +18,7 @@
 // to length + hash only, and the payload-body allowlist can never re-expose it.
 
 import { PeerRegistry } from '../../bare-protocol/src/registry.ts';
-// Bare has no TextEncoder (measured: bare v1.28.0) and this path runs during observe()
-// construction, so the platform codec would crash the flagship runtime outright.
+// Bare has no TextEncoder, and this path runs during observe() construction.
 import { utf8Encode } from '../../bare-protocol/src/utf8.ts';
 import type { PeerId } from '../../bare-protocol/src/envelope.ts';
 
@@ -69,12 +68,9 @@ export interface RedactorOptions {
   maxShapeDepth?: number;
 }
 
-// The keys that actually carry app payloads. 'args'/'response'/'item' are what wrapClient emits
-// (wrap-client.ts request.start/request.end/stream.data) and they were MISSING here: because this
-// redactor is field-name driven, every RPC argument and response was exported verbatim on the hub
-// path — where redaction is ON by default and the data leaves the device onto a public DHT topic.
-// 'body'/'payload'/'data' alone matched nothing any producer in this repo emits, which is why the
-// suite stayed green. Adding a producer? Add its payload key here, or it ships in the clear.
+// Field-name driven, so this list IS the redaction boundary: 'args'/'response'/'item' are what
+// wrapClient emits, and omitting them exported every RPC payload verbatim. Adding a producer?
+// Add its payload key here, or it ships in the clear.
 const DEFAULT_BODY_FIELDS = ['body', 'payload', 'data', 'args', 'response', 'item'];
 const DEFAULT_CIPHERTEXT_FIELDS = ['ciphertext', 'cipher', 'encrypted', 'enc'];
 const DEFAULT_PEER_FIELDS = ['peerId', 'peer', 'src', 'dst', 'unanswered'];
@@ -122,23 +118,13 @@ function stableStringify(value: unknown): string {
   return JSON.stringify(sortDeep(value, new Set(), 0));
 }
 
-/**
- * Depth of object nesting we will walk before summarising the rest as '[MaxDepth]'.
- * Anything deeper contributes nothing a developer can read in a row detail pane, and an
- * unbounded walk here is a crash in the host app (see the cycle note below).
- */
+/** Deeper than this contributes nothing readable, and an unbounded walk crashes the host app. */
 const MAX_SORT_DEPTH = 32;
 
 /**
- * NEVER-THROW: this walks objects the APP owns, not ours. `bridgeTraces` forwards a caller's
- * `props` unpreviewed and `data` is a bodyField, so a routine `trace({ ctx: this })` on a class
- * that references itself used to recurse until the stack blew — and because this runs inside the
- * flush timer, that RangeError became an uncaught exception in the host app.
- *
- * A cycle is now marked '[Circular]' and excessive depth '[MaxDepth]'. Both are stable strings,
- * so identical content still hashes identically — the property the content summary depends on.
- * `seen` tracks the ANCESTOR chain only (deleted on the way out), so a value legitimately
- * repeated in sibling positions is still walked rather than being mislabelled circular.
+ * NEVER-THROW: walks objects the APP owns, so a self-referencing one (`trace({ ctx: this })`)
+ * must not blow the stack inside the flush timer. `seen` tracks the ancestor chain only, so a
+ * value repeated in sibling positions is still walked rather than mislabelled circular.
  */
 function sortDeep(v: unknown, seen: Set<object>, depth: number): unknown {
   if (typeof v === 'bigint') return `[BigInt:${v.toString()}]`; // JSON.stringify throws on these

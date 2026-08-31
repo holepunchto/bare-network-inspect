@@ -37,11 +37,9 @@ export class BatchFlusher<T> {
   /** Number of times a batch was actually shipped. Should track intervals, not events. */
   flushCount = 0;
 
-  /** Batches lost because onFlush threw. A non-zero value means the timeline has holes. */
+  /** Batches lost because onFlush threw — non-zero means the timeline has holes. */
   droppedBatches = 0;
-  /** Rows lost with those batches. */
   droppedRows = 0;
-  /** Message from the most recent onFlush failure, for surfacing to the developer. */
   lastError: string | null = null;
   private batch: T[] = [];
   private readonly onFlush: FlushHandler<T>;
@@ -72,15 +70,9 @@ export class BatchFlusher<T> {
   /**
    * Ship the staged batch now (called by the timer, or manually in tests).
    *
-   * NEVER-THROW BOUNDARY. This runs from setInterval, so an exception here is an UNCAUGHT
-   * exception in the host app — a crash the app cannot see or catch, caused by the tool that
-   * was only supposed to watch it. Every other producer path is already guarded (emitSafe,
-   * the sink's try/catch); this was the hole.
-   *
-   * On failure the batch is DROPPED and counted, never retried and never passed on. That
-   * matters more than it looks: `onFlush` is where redaction happens, so continuing past a
-   * failure would export an UNREDACTED batch. A silent gap in the timeline is recoverable;
-   * a leak is not. `droppedBatches`/`droppedRows` make the gap visible instead of invisible.
+   * NEVER-THROW: runs from setInterval, so an exception here is uncatchable by the host app.
+   * On failure the batch is DROPPED, never passed on — onFlush is where redaction happens, so
+   * continuing past a failure would export an unredacted batch.
    */
   flushNow(): number {
     if (this.batch.length === 0) return 0;
