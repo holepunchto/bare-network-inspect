@@ -498,13 +498,12 @@
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = (v) => { try { return esc(JSON.stringify(v, null, 2)); } catch { return esc(String(v)); } };
   const time = (t) => new Date(t).toLocaleTimeString('en-GB', { hour12:false }) + '.' + String(t % 1000).padStart(3,'0');
-  // Numeric-by-convention wire fields (dur, count, lag, …). Nothing validates them: they arrive
-  // from whatever reporter is connected, and they were interpolated into innerHTML WITHOUT esc()
-  // precisely because "it's a number". A reporter sending dur:'<img src=x onerror=…>' therefore got
-  // script execution in this page — CodeQL js/xss, confirmed with a working PoC. So: a real finite
-  // number renders as itself; anything else renders as ESCAPED TEXT rather than being dropped,
-  // because silently hiding malformed data would be its own kind of lie in an inspector.
-  const num = (v) => (v == null ? '' : (typeof v === 'number' && Number.isFinite(v) ? String(v) : esc(String(v))));
+  // Numeric-by-convention wire fields (dur, count, lag, …). Nothing validates their type, and
+  // interpolating them raw let dur:'<img src=x onerror=…>' execute script here (CodeQL js/xss).
+  // Escapes UNCONDITIONALLY: esc() cannot alter any numeric form (42, -1.5, 1e+21, NaN all come
+  // out identical), and a conditional sanitiser leaves a String(v) path static analysis must
+  // treat as tainted — which is why the first version of this fix did not close the alert.
+  const num = (v) => (v == null ? '' : esc(String(v)));
 
   // --- Collapsible JSON tree. Every key/value is esc()'d (same XSS rule as fmt). Objects/arrays
   // become foldable <details>; primitives are plain rows. `path` keys the fold state so a live
