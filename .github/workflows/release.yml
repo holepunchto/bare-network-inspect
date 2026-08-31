@@ -55,8 +55,7 @@ on:
         type: string
         default: ''
 
-# Two runs bumping at once would race on the version and on the push. Queue them instead of
-# cancelling: a half-finished release (bumped + pushed, not published) is worse than a slow one.
+# Queue, don't cancel: a half-finished release (bumped + pushed, not published) beats a slow one.
 concurrency:
   group: release
   cancel-in-progress: false
@@ -70,7 +69,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # the bump step pushes a commit + tag, so it needs real history and kept credentials
+          # the bump step pushes a commit + tag
           fetch-depth: 0
           persist-credentials: true
 
@@ -78,8 +77,7 @@ jobs:
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
-          # scope matters: WITHOUT it setup-node sets the DEFAULT registry, which would send public
-          # deps (esbuild) to the scoped registry too. With it, only @holepunchto is mapped.
+          # without scope, setup-node overrides the DEFAULT registry and sends esbuild there too
           scope: '@holepunchto'
 
       - name: Verification gate (blocks publish if red)
@@ -93,8 +91,7 @@ jobs:
           REF: ${{ github.ref }}
         run: |
           set -euo pipefail
-          # A tag ref has no branch to commit to. Refuse rather than produce a detached-HEAD commit
-          # that goes nowhere and leaves the tag and the registry disagreeing.
+          # A tag ref has no branch to commit to — refuse rather than commit to a detached HEAD.
           case "$REF" in
             refs/heads/*) BRANCH="${REF#refs/heads/}" ;;
             *) echo "::error::bump requires a branch ref, got $REF. Re-run this workflow from a branch (usually main)." ; exit 1 ;;
@@ -102,8 +99,7 @@ jobs:
 
           cd packages/bare-observe
           OLD="$(node -p "require('./package.json').version")"
-          # --no-git-tag-version: npm must not tag here. We tag once, below, after the commit, so the
-          # tag always points at the commit that actually carries the new version.
+          # npm must not tag here; we tag after the commit so the tag points at the right commit.
           npm version "$BUMP" --no-git-tag-version >/dev/null
           NEW="$(node -p "require('./package.json').version")"
           cd - >/dev/null
@@ -119,8 +115,7 @@ jobs:
           git add packages/bare-observe/package.json packages/bare-observe/package-lock.json
           git commit -m "release: v$NEW"
           git tag -a "v$NEW" -m "v$NEW"
-          # Push the commit FIRST: if the tag landed and the commit did not, the tag would point at a
-          # commit nobody else has.
+          # Commit first: a tag without its commit points at something nobody else has.
           git push origin "HEAD:refs/heads/$BRANCH"
           git push origin "refs/tags/v$NEW"
 
@@ -148,8 +143,8 @@ jobs:
       - name: Install build deps + publish (idempotent, per package)
         env:
           DIRS: ${{ steps.pick.outputs.dirs }}
-          # No .npmrc is committed — auth comes solely from setup-node's generated config, which
-          # reads NODE_AUTH_TOKEN. This must be the npm automation token, NOT the GitHub token.
+          # No committed .npmrc: auth is setup-node's config reading NODE_AUTH_TOKEN.
+          # Must be the npm AUTOMATION token, not the GitHub token.
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -uo pipefail
@@ -184,8 +179,7 @@ jobs:
             TAG="v$(jq -r .version packages/bare-observe/package.json)"   # jq is preinstalled on GitHub-hosted runners
           fi
           if git ls-remote --tags origin "refs/tags/$TAG" | grep -q "refs/tags/$TAG"; then
-            # The bump step already created and pushed this tag. Do NOT re-tag — but a tag without a
-            # GitHub Release is easy to miss, so fill in the Release from the existing tag.
+            # The bump step already pushed this tag; fill in the missing Release rather than re-tag.
             if gh release view "$TAG" >/dev/null 2>&1; then
               echo "tag $TAG and its release already exist — nothing to do"
             else

@@ -1,16 +1,9 @@
 // Proves the never-throw boundary holds AT THE FLUSH TIMER — the one place it did not.
 //
-// WHY THIS EXISTS: BatchFlusher.flushNow() called onFlush unguarded, and start() runs it from
-// setInterval. observe()'s onFlush calls redactor.redactBatch, and the redactor's stableStringify
-// walked app-owned objects with no cycle guard. So a routine `trace({ ctx: this })` on a
-// self-referencing class produced a RangeError that escaped the timer as an UNCAUGHT EXCEPTION IN
-// THE HOST APP — a crash the app cannot see or catch, caused by the tool that was only meant to
-// watch it. Every other producer path (emitSafe, the sink's try/catch) was already guarded.
-//
-// The fix has a trap this suite exists to police: a catch placed so that a redaction FAILURE falls
-// through to exporter.export(batch) would convert a crash into an UNREDACTED EXPORT. So the
-// assertions below check not only that nothing throws, but that the exporter received NOTHING and
-// the loss was counted.
+// flushNow() called onFlush unguarded from setInterval, and the redactor walked app-owned objects
+// with no cycle guard, so `trace({ ctx: this })` crashed the HOST app with an uncatchable
+// RangeError. The trap this suite polices: a catch that let a redaction failure fall through to
+// exporter.export() would turn that crash into an UNREDACTED EXPORT.
 
 import { BatchFlusher } from '../packages/bare-probe/core/flush.ts';
 import { Redactor } from '../packages/bare-probe/core/redactor.ts';

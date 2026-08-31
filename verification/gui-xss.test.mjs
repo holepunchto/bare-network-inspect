@@ -1,19 +1,13 @@
-// Guards the GUI against the specific XSS mistake that actually happened: interpolating a
-// numeric-by-convention wire field into innerHTML WITHOUT escaping, because "it's a number".
+// Guards the GUI against the XSS that actually happened: interpolating a numeric-by-convention
+// wire field into innerHTML unescaped, because "it's a number".
 //
-// WHAT HAPPENED: `<td class="num">${r.dur ?? ''}</td>` and two sibling sites interpolated `r.dur` /
-// `r.count` raw. Those fields come from whatever reporter is connected to the GUI's WebSocket and
-// nothing validates their type. A reporter sending
-//     dur: '<img src=x onerror="document.title=\'XSS-PROVEN\'">'
-// achieved script execution in the inspector page — confirmed with a live PoC, and reported
-// independently by CodeQL as js/xss (high). That page holds the whole capture and, when the source
-// advertises caps.invoke, can drive replay into the app, so script execution there is not cosmetic.
+// `${r.dur ?? ''}` and two siblings shipped dur/count raw. Those fields come from whatever reporter
+// is connected and nothing validates their type, so dur:'<img src=x onerror=…>' executed script in
+// the inspector page (CodeQL js/xss, reproduced with a PoC). That page holds the whole capture and
+// can drive replay into the app.
 //
-// Why a STATIC scan rather than a DOM test: verification/ is deliberately dependency-free (no
-// jsdom), and this class of bug is visible in the source — a bare `${r.dur}` is wrong regardless of
-// what the DOM does with it. The scan is heuristic by nature; its job is to make the "numbers don't
-// need escaping" assumption impossible to reintroduce silently, not to prove the GUI XSS-free.
-// Section 3 is the control: the scanner MUST flag the original vulnerable line.
+// Static, not DOM-based: verification/ is dependency-free (no jsdom), and a bare `${r.dur}` is
+// wrong regardless. Section 3 is the control — the scanner MUST flag the original line.
 
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';

@@ -1,16 +1,11 @@
 // Proves the PUBLISHED artifact works — not the worktree.
 //
-// WHY THIS EXISTS: `files` in package.json decides what ships. bin/bare-observe.mjs has a
-// top-level `import … from '../src/init.mjs'`, so dropping src/ from `files` produced a tarball
-// where BOTH `npx bare-observe init` and `npx bare-observe gui` died with ERR_MODULE_NOT_FOUND —
-// while every other suite here stayed green, because they all run against the worktree, where
-// src/ obviously exists. A packaging break is invisible to a worktree test by construction.
+// bin/bare-observe.mjs imports ../src/init.mjs at the top level, so dropping src/ from `files`
+// shipped a tarball where both CLI verbs died with ERR_MODULE_NOT_FOUND — invisible to every other
+// suite, which all run against the worktree where src/ exists. So: pack for real, unpack, run it.
 //
-// So: pack for real, unpack into a temp dir, and run the CLI from there.
-//
-// SKIPs cleanly when npm is unavailable, keeping the suite's zero-dependency promise. Uses
-// --ignore-scripts so it does not need esbuild: this suite checks REACHABILITY of what ships,
-// not the bundle's contents.
+// SKIPs when npm is absent (keeps the suite dependency-free). --ignore-scripts, so this checks
+// REACHABILITY of what ships, not bundle contents.
 
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, readdirSync } from 'node:fs';
