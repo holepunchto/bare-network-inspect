@@ -93,8 +93,13 @@ check('table MS column uses num(r.dur)', src.includes('${num(r.dur)}'));
 check('detail header uses num() for dur and count',
   src.includes("num(r.dur) + ' ms'") && src.includes("num(r.count) + ' msgs'"));
 check('stream heading uses num(r.count)', /\$\{num\(r\.count\s*\?\?\s*0\)\}/.test(src));
-check('num() escapes a non-number instead of trusting it',
-  /const num = .*Number\.isFinite.*esc\(String\(v\)\)/.test(src));
+// num() must escape UNCONDITIONALLY. A `typeof v === 'number'` fast path is not merely redundant
+// (esc() cannot alter any numeric form) — it leaves a String(v) path that static analysis must
+// treat as tainted, which is exactly why CodeQL kept reporting js/xss after the first fix.
+check('num() escapes unconditionally (no typeof/isFinite fast path)',
+  /const num = \(v\) => \(v == null \? '' : esc\(String\(v\)\)\)/.test(src));
+check('num() has no unsanitised String(v) branch',
+  !/const num = [^;]*Number\.isFinite/.test(src) && !/const num = [^;]*\?\s*String\(v\)\s*:/.test(src));
 
 // --- 3. CONTROL: the scanner must catch the ORIGINAL vulnerable code ---
 // Without this, section 1 could be passing because the scan matches nothing at all.

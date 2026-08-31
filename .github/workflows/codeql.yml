@@ -1,0 +1,66 @@
+# CodeQL — advanced setup, replacing GitHub's "default setup" (the `automatic` configuration).
+#
+# WHY ADVANCED: with default setup the analysed languages are a UI checkbox that nothing in the repo
+# records, and it had picked up `java-kotlin` and `swift` from packages/bare-probe/native/**. That
+# code is UNVERIFIED source with no gradle project and no Xcode project — it has never been
+# compiled anywhere (see native/README.md) — so those analyses can only produce 0 results or fail
+# for want of a build. Both ran on 5edb0fc and returned results=0, confirming it.
+#
+# Advanced setup puts the language list in this file, where it is reviewable and diffable, and it
+# runs on pull_request too — default setup gave this repo no code scanning on PRs at all.
+#
+# BEFORE MERGING: turn OFF CodeQL default setup
+#   Settings → Advanced Security → Code scanning → CodeQL analysis → ⋯ → Disable CodeQL
+# Leaving both enabled means every alert is reported twice, by two configurations.
+
+name: codeql
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly, so newly published queries reach existing code without waiting for a push.
+    - cron: '27 4 * * 1'
+
+# A second push while an analysis is running only wastes runner time on a stale commit.
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write   # required to upload the SARIF results
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        # JavaScript/TypeScript covers packages/**/src, the GUI page and verification/.
+        # `actions` scans these workflow files themselves.
+        #
+        # DELIBERATELY EXCLUDED — java-kotlin, swift:
+        #   packages/bare-probe/native/** holds Kotlin, Swift and ObjC++ that is source-only and
+        #   uncompilable here. CodeQL needs a build for those languages; without one it yields
+        #   nothing useful. Add them back the same day a real gradle/Xcode build exists, not before.
+        language: [javascript-typescript, actions]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          config-file: ./.github/codeql/codeql-config.yml
+
+      # No build step: both languages analysed here are interpreted, and the published bundle is
+      # produced by esbuild from the same sources CodeQL already reads.
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
